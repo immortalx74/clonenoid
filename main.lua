@@ -11,7 +11,6 @@ end
 function lovr.draw( pass )
 	local game_pass = Game.Draw()
 
-	-- pass:setProjection( 1, mat4():orthographic( pass:getDimensions() ) )
 	pass:setSampler( sampler )
 	pass:fill( game_texture )
 
