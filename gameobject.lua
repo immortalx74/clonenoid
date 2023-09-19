@@ -10,8 +10,12 @@ function GameObject:New( type, position, animation_type )
 	obj.type = type
 	obj.position = lovr.math.newVec2( position )
 
-	if animation_type == e_animation.bar_v then
-		obj.animation = Animation:New( 60, vec2( 8, 232 ), textures.bar_v, 7, e_orientation.horizontal )
+	if animation_type == e_animation.bar_v_closed then
+		obj.animation = Animation:New( 1, vec2( 8, 232 ), textures.bar_v_closed, 1, e_orientation.horizontal )
+	elseif animation_type == e_animation.bar_v_opening then
+		obj.animation = Animation:New( 20, vec2( 8, 232 ), textures.bar_v_opening, 3, e_orientation.horizontal )
+	elseif animation_type == e_animation.bar_v_open then
+		obj.animation = Animation:New( 30, vec2( 8, 232 ), textures.bar_v_open, 3, e_orientation.horizontal )
 	elseif animation_type == e_animation.paddle_normal then
 		obj.animation = Animation:New( 30, vec2( 32, 8 ), textures.paddle_normal, 6, e_orientation.vertical )
 	elseif animation_type == e_animation.paddle_big then
@@ -44,7 +48,10 @@ function GameObject:New( type, position, animation_type )
 		obj.animation = Animation:New( 60, vec2( 16, 8 ), textures.powerup_player, 8, e_orientation.horizontal )
 	elseif animation_type == e_animation.powerup_s then
 		obj.animation = Animation:New( 60, vec2( 16, 8 ), textures.powerup_slow, 8, e_orientation.horizontal )
+	elseif animation_type == e_animation.life then
+		obj.animation = Animation:New( 1, vec2( 16, 8 ), textures.life, 1, e_orientation.horizontal )
 	end
+	obj.animation_type = animation_type
 	obj.animation.time_prev = lovr.timer.getTime()
 	table.insert( game_objects, obj )
 

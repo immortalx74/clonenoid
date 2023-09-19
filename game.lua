@@ -31,6 +31,9 @@ ffi.cdef( [[
 	GLFWwindow* os_get_glfw_window(void);
 	void glfwGetWindowPos(GLFWwindow* window, int *xpos, int *ypos);
 	void glfwSetInputMode(GLFWwindow * window, int GLFW_CURSOR, int GLFW_CURSOR_HIDDEN);
+	typedef void(*GLFWmousebuttonfun)(GLFWwindow*, int, int, int);
+	int glfwGetMouseButton(GLFWwindow* window, int button);
+	GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
 ]] )
 GLFW_CURSOR        = 0x00033001
 GLFW_CURSOR_HIDDEN = 0x00034002
@@ -72,6 +75,10 @@ e_animation        = {
 	powerup_l = 15,
 	powerup_p = 16,
 	powerup_s = 17,
+	bar_v_closed = 18,
+	bar_v_opening = 19,
+	bar_v_open = 20,
+	life = 21
 }
 
 local Game         = {}
@@ -106,11 +113,15 @@ metrics            = {
 	brick_w = 16,
 	brick_h = 8,
 	paddle_y = 236,
-	paddle_constrain_left = 24,
-	paddle_constrain_right = 200,
+	paddle_constrain_left_normal = 24,
+	paddle_constrain_right_normal = 200,
+	paddle_constrain_left_big = 32,
+	paddle_constrain_right_big = 192,
 	ball_constrain_left = 10,
 	ball_constrain_right = 214,
-	ball_constrain_top = 24
+	ball_constrain_top = 24,
+	life_bar_left = 16,
+	life_bar_top = 252
 }
 
 levels             = {}
@@ -127,9 +138,18 @@ obj_paddle         = nil
 obj_ball           = nil
 obj_gate           = nil
 balls              = {}
-powerup            = { current = nil, dropping = nil, last_time = 0, interval = math.random( 4, 7 ) }
+powerup            = { current = nil, dropping = nil, last_time = 0, interval = math.random( 4, 7 ), type = nil }
+mouse              = { position = lovr.math.newVec2( 0, 0 ), prev_frame = 0, this_frame = 0 }
+life_bar           = { total = 3, objects = {} }
 
-function Split( input )
+local function IsMouseDown()
+	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
+		return true
+	end
+	return false
+end
+
+local function Split( input )
 	local stripped = input:gsub( "[\r\n,]", "" ) -- Remove newlines and commas
 	local characters = {}
 
@@ -151,7 +171,12 @@ end
 
 local function LoadTextures()
 	textures.bg = lovr.graphics.newTexture( "res/sprites/bg.png" )
-	textures.bar_v = lovr.graphics.newTexture( "res/sprites/bar_v.png" )
+
+	textures.life = lovr.graphics.newTexture( "res/sprites/life.png" )
+
+	textures.bar_v_closed = lovr.graphics.newTexture( "res/sprites/bar_v_closed.png" )
+	textures.bar_v_opening = lovr.graphics.newTexture( "res/sprites/bar_v_opening.png" )
+	textures.bar_v_open = lovr.graphics.newTexture( "res/sprites/bar_v_open.png" )
 
 	textures.bar_h_l = lovr.graphics.newTexture( "res/sprites/bar_h_l.png" )
 	textures.bar_h_r = lovr.graphics.newTexture( "res/sprites/bar_h_r.png" )
@@ -175,7 +200,18 @@ local function LoadTextures()
 	textures.ball = lovr.graphics.newTexture( "res/sprites/ball.png" )
 end
 
+local function DropPowerUp( x, y )
+	-- Drop random powerup
+	if not powerup.dropping and lovr.timer.getTime() - powerup.last_time > powerup.interval then
+		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
+		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
+		powerup.type = e_animation.powerup_e
+		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
+	end
+end
+
 local function GenerateLevel( idx )
+	-- background
 	local bg = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
 	bg.animation:SetFrame( level_idx % 4 )
 	bg.animation:SetPaused( true )
@@ -187,15 +223,15 @@ local function GenerateLevel( idx )
 	bhr.animation:SetFrame( 1 )
 	bhr.animation:SetPaused( true )
 
-	local bvl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_l_left, metrics.bar_v_l_top ), e_animation.bar_v )
+	local bvl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_l_left, metrics.bar_v_l_top ), e_animation.bar_v_closed )
 	bvl.animation:SetFrame( 1 )
 	bvl.animation:SetPaused( true )
-	obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v )
+	obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_closed )
 	obj_gate.animation:SetFrame( 1 )
 	obj_gate.animation:SetPaused( true )
 
+	-- Bricks
 	local level = levels[ level_idx ]
-
 	local x = metrics.wall_start_left
 	local y = metrics.wall_start_top
 
@@ -214,18 +250,232 @@ local function GenerateLevel( idx )
 		end
 	end
 
+	-- Paddle
 	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_normal )
 	obj_paddle.prev_x = 0
 
+	-- Ball
 	balls = {}
-	local b = GameObject:New( e_object_type.ball, vec2( 100, 180 ), e_animation.ball )
+	-- local b = GameObject:New( e_object_type.ball, vec2( 100, 180 ), e_animation.ball )
+	local b = GameObject:New( e_object_type.ball, vec2( window.w / 2, metrics.paddle_y - 8 ), e_animation.ball )
 	b.velocity_x = 2
 	b.velocity_y = 2
+	b.sticky = true
+	b.last_time = lovr.timer.getTime()
 	table.insert( balls, b )
+
+	-- Life bar
+	local left = metrics.life_bar_left
+	for i = 1, life_bar.total - 1 do
+		local l = GameObject:New( e_object_type.decorative, vec2( left, metrics.life_bar_top ), e_animation.life )
+		table.insert( life_bar.objects, l )
+		left = left + 16
+	end
 
 	powerup.last_time = lovr.timer.getTime()
 
 	game_state = e_game_state.play
+end
+
+local function GetWindowPos()
+	local wx, wy = ffi.new( 'int[1]' ), ffi.new( 'int[1]' )
+	glfw.glfwGetWindowPos( window.handle, wx, wy )
+	window.x = wx[ 0 ]
+	window.y = wy[ 0 ]
+end
+
+local function GetMousePos()
+	local mouse_pos = ffi.new( "POINT[1]" )
+	ffi.C.GetCursorPos( mouse_pos )
+	mouse.position.x = mouse_pos[ 0 ].x
+	mouse.position.y = mouse_pos[ 0 ].y
+
+	if glfw.glfwGetMouseButton( window.handle, 0 ) > 0 then
+		if mouse.prev_frame == 0 then
+			mouse.prev_frame = 1
+			mouse.this_frame = 1
+		else
+			mouse.prev_frame = 1
+			mouse.this_frame = 0
+		end
+	else
+		mouse.prev_frame = 0
+	end
+end
+
+local function GetWindowScale()
+	return lovr.system.getWindowWidth() / 224
+end
+
+local function UpdatePowerUp()
+	-- Powerup position
+	if powerup.dropping then
+		powerup.dropping.position.y = powerup.dropping.position.y + 1
+		-- Powerup went off screen
+		if powerup.dropping.position.y > window.h then
+			powerup.dropping:Destroy()
+			powerup.dropping = nil
+			powerup.last_time = lovr.timer.getTime()
+			-- Powerup -> paddle collision
+		elseif powerup.dropping.position.x > obj_paddle.position.x - 16 and powerup.dropping.position.x < obj_paddle.position.x + 16 then
+			if powerup.dropping.position.y > obj_paddle.position.y - 4 then
+				powerup.current = powerup.dropping
+
+				-- Powerup behavior
+				if powerup.type == e_animation.powerup_b then
+					obj_gate:Destroy()
+					obj_gate = nil
+					obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_opening )
+				elseif powerup.type == e_animation.powerup_c then
+				elseif powerup.type == e_animation.powerup_d then
+				elseif powerup.type == e_animation.powerup_e then
+					obj_paddle:Destroy()
+					obj_paddle = nil
+					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_big )
+					obj_paddle.prev_x = 0
+				elseif powerup.type == e_animation.powerup_l then
+				elseif powerup.type == e_animation.powerup_p then
+					local left = metrics.life_bar_left + ((life_bar.total - 1) * 16)
+					local l = GameObject:New( e_object_type.decorative, vec2( left, metrics.life_bar_top ), e_animation.life )
+					life_bar.total = life_bar.total + 1
+					powerup.current = nil
+				elseif powerup.type == e_animation.powerup_s then
+
+				end
+				powerup.dropping:Destroy()
+				powerup.dropping = nil
+				powerup.last_time = lovr.timer.getTime()
+			end
+		end
+	end
+
+	if powerup.current then
+		if powerup.type == e_animation.powerup_b then
+			if obj_gate.animation_type == e_animation.bar_v_opening and obj_gate.animation:GetFrame() == 3 then
+				obj_gate:Destroy()
+				obj_gate = nil
+				obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_open )
+			end
+		end
+	end
+end
+
+local function SetPaddlePos()
+	local scale = GetWindowScale()
+	obj_paddle.position.x = (mouse.position.x / scale) - (window.x / scale)
+
+	local constrain_left = metrics.paddle_constrain_left_normal
+	local constrain_right = metrics.paddle_constrain_right_normal
+
+	if obj_paddle.animation_type == e_animation.paddle_big then
+		constrain_left = metrics.paddle_constrain_left_big
+		constrain_right = metrics.paddle_constrain_right_big
+	end
+
+	if obj_paddle.position.x < constrain_left then
+		obj_paddle.position.x = constrain_left
+	end
+
+	if obj_gate.animation_type ~= e_animation.bar_v_open then
+		if obj_paddle.position.x > constrain_right then
+			obj_paddle.position.x = constrain_right
+		end
+	end
+
+	-- Exit from gate
+	if obj_paddle.position.x > window.w + 16 then
+		print( "exit" )
+	end
+
+	obj_paddle.prev_x = obj_paddle.position.x
+end
+
+local function SetBallPos()
+	-- Ball[s] position
+	for i = 1, #balls do
+		if balls[ i ].sticky then
+			balls[ i ].position.x = obj_paddle.position.x
+			balls[ i ].position.y = obj_paddle.position.y - 8
+			if IsMouseDown() or lovr.timer.getTime() - balls[ i ].last_time > 2 then
+				balls[ i ].sticky = false
+				balls[ i ].velocity_x = 2
+				balls[ i ].velocity_y = -2
+			end
+		else
+			balls[ i ].position.x = balls[ i ].position.x + balls[ i ].velocity_x
+			balls[ i ].position.y = balls[ i ].position.y + balls[ i ].velocity_y
+		end
+
+		if balls[ i ].position.x < metrics.ball_constrain_left then
+			balls[ i ].position.x = metrics.ball_constrain_left
+			balls[ i ].velocity_x = -balls[ i ].velocity_x
+		end
+
+		if balls[ i ].position.x > metrics.ball_constrain_right then
+			balls[ i ].position.x = metrics.ball_constrain_right
+			balls[ i ].velocity_x = -balls[ i ].velocity_x
+		end
+
+		if balls[ i ].position.y < metrics.ball_constrain_top then
+			balls[ i ].position.y = metrics.ball_constrain_top
+			balls[ i ].velocity_y = -balls[ i ].velocity_y
+		end
+
+		-- NOTE: bounces on floor
+		if balls[ i ].position.y > window.h then
+			balls[ i ].position.y = window.h
+			balls[ i ].velocity_y = -balls[ i ].velocity_y
+		end
+
+		-- Ball -> paddle collision
+		if balls[ i ].position.x > obj_paddle.position.x - 16 and balls[ i ].position.x < obj_paddle.position.x + 16 then
+			if balls[ i ].position.y > obj_paddle.position.y - 4 then
+				balls[ i ].velocity_y = -balls[ i ].velocity_y
+
+				local dir = 0
+
+				if obj_paddle.position.x > obj_paddle.prev_x then
+					dir = 1
+				end
+
+				if obj_paddle.position.x < obj_paddle.prev_x then
+					dir = -1
+				end
+
+				if balls[ i ].position.x > obj_paddle.position.x + 6 then
+					-- right
+					balls[ i ].velocity_x = balls[ i ].velocity_x + 0.5
+				elseif balls[ i ].position.x < obj_paddle.position.x - 6 then
+					-- left
+					balls[ i ].velocity_x = balls[ i ].velocity_x - 0.5
+				else
+					-- middle
+					local sign = 1
+					if balls[ i ].velocity_x < 0 then sign = -1 end
+					balls[ i ].velocity_x = 2 * sign
+				end
+			end
+		end
+
+		local xx = balls[ i ].position.x
+		local yy = balls[ i ].position.y
+
+		-- Bricks collision
+		for j, v in ipairs( game_objects ) do
+			if v.type == e_object_type.brick then
+				local l = v.position.x - 8
+				local r = v.position.x + 8
+				local t = v.position.y - 4
+				local b = v.position.y + 4
+
+				if xx > l and xx < r and yy > t and yy < b then
+					balls[ i ].velocity_y = -balls[ i ].velocity_y
+					DropPowerUp( v.position.x, v.position.y )
+					table.remove( game_objects, j )
+				end
+			end
+		end
+	end
 end
 
 function Game.Init()
@@ -239,134 +489,16 @@ function Game.Init()
 end
 
 function Game.Update( dt )
-	local wx, wy = ffi.new( 'int[1]' ), ffi.new( 'int[1]' )
-	glfw.glfwGetWindowPos( window.handle, wx, wy )
-	window.x = wx[ 0 ]
-	window.y = wy[ 0 ]
-
-	local mouse_pos = ffi.new( "POINT[1]" )
-	ffi.C.GetCursorPos( mouse_pos )
-	local scale = lovr.system.getWindowWidth() / 224
-
+	GetWindowPos()
+	GetMousePos()
 	GameObject.UpdateAll( dt )
 
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
 	elseif game_state == e_game_state.play then
-		-- Powerup position
-		if powerup.dropping then
-			powerup.dropping.position.y = powerup.dropping.position.y + 1
-			if powerup.dropping.position.y > window.h then
-				powerup.dropping:Destroy()
-				powerup.dropping = nil
-				powerup.last_time = lovr.timer.getTime()
-			end
-
-			-- Powerup -> paddle collision
-			if powerup.dropping.position.x > obj_paddle.position.x - 16 and powerup.dropping.position.x < obj_paddle.position.x + 16 then
-				if powerup.dropping.position.y > obj_paddle.position.y - 4 then
-					powerup.current = powerup.dropping
-					-- TODO: handle what to do when catching powerup
-					powerup.dropping:Destroy()
-					powerup.dropping = nil
-					powerup.last_time = lovr.timer.getTime()
-				end
-			end
-		end
-
-		-- Paddle position
-		obj_paddle.position.x = (mouse_pos[ 0 ].x / scale) - (window.x / scale)
-
-		if obj_paddle.position.x < metrics.paddle_constrain_left then
-			obj_paddle.position.x = metrics.paddle_constrain_left
-		end
-
-		if obj_paddle.position.x > metrics.paddle_constrain_right then
-			obj_paddle.position.x = metrics.paddle_constrain_right
-		end
-
-		-- Ball[s] position
-		for i = 1, #balls do
-			balls[ i ].position.x = balls[ i ].position.x + balls[ i ].velocity_x
-			balls[ i ].position.y = balls[ i ].position.y + balls[ i ].velocity_y
-
-			if balls[ i ].position.x < metrics.ball_constrain_left then
-				balls[ i ].position.x = metrics.ball_constrain_left
-				balls[ i ].velocity_x = -balls[ i ].velocity_x
-			end
-
-			if balls[ i ].position.x > metrics.ball_constrain_right then
-				balls[ i ].position.x = metrics.ball_constrain_right
-				balls[ i ].velocity_x = -balls[ i ].velocity_x
-			end
-
-			if balls[ i ].position.y < metrics.ball_constrain_top then
-				balls[ i ].position.y = metrics.ball_constrain_top
-				balls[ i ].velocity_y = -balls[ i ].velocity_y
-			end
-
-			-- NOTE: bounces on floor
-			if balls[ i ].position.y > window.h then
-				balls[ i ].position.y = window.h
-				balls[ i ].velocity_y = -balls[ i ].velocity_y
-			end
-
-			-- Ball -> paddle collision
-			if balls[ i ].position.x > obj_paddle.position.x - 16 and balls[ i ].position.x < obj_paddle.position.x + 16 then
-				if balls[ i ].position.y > obj_paddle.position.y - 4 then
-					balls[ i ].velocity_y = -balls[ i ].velocity_y
-
-					local dir = 0
-
-					if obj_paddle.position.x > obj_paddle.prev_x then
-						dir = 1
-					end
-
-					if obj_paddle.position.x < obj_paddle.prev_x then
-						dir = -1
-					end
-
-					if balls[ i ].position.x > obj_paddle.position.x + 6 then
-						-- right
-						balls[ i ].velocity_x = balls[ i ].velocity_x + 0.5
-					elseif balls[ i ].position.x < obj_paddle.position.x - 6 then
-						-- left
-						balls[ i ].velocity_x = balls[ i ].velocity_x - 0.5
-					else
-						-- middle
-						local sign = 1
-						if balls[ i ].velocity_x < 0 then sign = -1 end
-						balls[ i ].velocity_x = 2 * sign
-					end
-				end
-			end
-
-			local xx = balls[ i ].position.x
-			local yy = balls[ i ].position.y
-
-			-- Bricks collision
-			for j, v in ipairs( game_objects ) do
-				if v.type == e_object_type.brick then
-					local l = v.position.x - 8
-					local r = v.position.x + 8
-					local t = v.position.y - 4
-					local b = v.position.y + 4
-
-					if xx > l and xx < r and yy > t and yy < b then
-						balls[ i ].velocity_y = -balls[ i ].velocity_y
-
-						-- Drop random powerup
-						if not powerup.dropping and lovr.timer.getTime() - powerup.last_time > powerup.interval then
-							powerup.dropping = GameObject:New( e_object_type.powerup, vec2( v.position.x, v.position.y ), math.random( e_animation.powerup_b, e_animation.powerup_s ) )
-						end
-
-						table.remove( game_objects, j )
-					end
-				end
-			end
-		end
-
-		obj_paddle.prev_x = obj_paddle.position.x
+		UpdatePowerUp()
+		SetPaddlePos()
+		SetBallPos()
 	end
 end
 
