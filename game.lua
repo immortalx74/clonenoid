@@ -260,20 +260,6 @@ local function GenerateLevel( idx )
 	bg.animation:SetFrame( level_idx % 4 )
 	bg.animation:SetPaused( true )
 
-	local bhl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_h_l_left, metrics.bar_h_l_top ), e_animation.bar_h_l )
-	bhl.animation:SetFrame( 1 )
-	bhl.animation:SetPaused( true )
-	local bhr = GameObject:New( e_object_type.decorative, vec2( metrics.bar_h_r_left, metrics.bar_h_r_top ), e_animation.bar_h_r )
-	bhr.animation:SetFrame( 1 )
-	bhr.animation:SetPaused( true )
-
-	local bvl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_l_left, metrics.bar_v_l_top ), e_animation.bar_v_closed )
-	bvl.animation:SetFrame( 1 )
-	bvl.animation:SetPaused( true )
-	obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_closed )
-	obj_gate.animation:SetFrame( 1 )
-	obj_gate.animation:SetPaused( true )
-
 	-- Bricks
 	local level = levels[ level_idx ]
 	local x = metrics.wall_start_left
@@ -293,6 +279,21 @@ local function GenerateLevel( idx )
 			x = x + metrics.brick_w
 		end
 	end
+
+	-- Side and top bars
+	local bhl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_h_l_left, metrics.bar_h_l_top ), e_animation.bar_h_l )
+	bhl.animation:SetFrame( 1 )
+	bhl.animation:SetPaused( true )
+	local bhr = GameObject:New( e_object_type.decorative, vec2( metrics.bar_h_r_left, metrics.bar_h_r_top ), e_animation.bar_h_r )
+	bhr.animation:SetFrame( 1 )
+	bhr.animation:SetPaused( true )
+
+	local bvl = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_l_left, metrics.bar_v_l_top ), e_animation.bar_v_closed )
+	bvl.animation:SetFrame( 1 )
+	bvl.animation:SetPaused( true )
+	obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_closed )
+	obj_gate.animation:SetFrame( 1 )
+	obj_gate.animation:SetPaused( true )
 
 	-- Paddle
 	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_normal )
