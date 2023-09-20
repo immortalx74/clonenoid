@@ -472,7 +472,11 @@ local function SetBallPos()
 		end
 
 		-- Ball -> paddle collision
-		if balls[ i ].position.x > obj_paddle.position.x - 16 and balls[ i ].position.x < obj_paddle.position.x + 16 then
+		local half_size = 16
+		if obj_paddle.animation_type == e_animation.paddle_big then
+			half_size = 24
+		end
+		if balls[ i ].position.x > obj_paddle.position.x - half_size and balls[ i ].position.x < obj_paddle.position.x + half_size then
 			if balls[ i ].position.y > obj_paddle.position.y - 4 then
 				balls[ i ].velocity_y = -balls[ i ].velocity_y
 
