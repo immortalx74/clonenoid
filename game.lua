@@ -377,7 +377,9 @@ end
 
 local function UpdateBullets()
 	for i, k in ipairs( bullets ) do
-		k.position.y = k.position.y - 4
+		if not k.hit then
+			k.position.y = k.position.y - 4
+		end
 
 		if k.position.y < metrics.bar_h_l_top + 8 then
 			k.marked = true
@@ -400,7 +402,8 @@ local function UpdateBullets()
 				local bul_b = yy + 4
 
 				if bul_l < br_r and bul_r > br_l and bul_t < br_b and bul_b > br_t then
-					k.marked = true
+					-- k.marked = true
+					k.hit = true
 					v.strength = v.strength - 1
 					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
 						v.animation:SetPaused( false )
@@ -417,6 +420,13 @@ local function UpdateBullets()
 	end
 
 	for i, v in ipairs( bullets ) do
+		if v.hit then
+			v.animation:SetPaused( false )
+			if v.animation:GetFrame() == 3 then
+				v.hit = false
+				v.marked = true
+			end
+		end
 		if v.marked then
 			bullets[ i ]:Destroy()
 			table.remove( bullets, i )

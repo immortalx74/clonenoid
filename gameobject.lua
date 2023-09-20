@@ -53,7 +53,7 @@ function GameObject:New( type, position, animation_type )
 	elseif animation_type == e_animation.life then
 		obj.animation = Animation:New( 1, vec2( 16, 8 ), textures.life, 1, e_orientation.horizontal )
 	elseif animation_type == e_animation.laser then
-		obj.animation = Animation:New( 10, vec2( 16, 8 ), textures.laser, 3, e_orientation.vertical )
+		obj.animation = Animation:New( 60, vec2( 16, 8 ), textures.laser, 4, e_orientation.vertical )
 	end
 	obj.animation_type = animation_type
 	obj.animation.time_prev = lovr.timer.getTime()
@@ -74,7 +74,7 @@ end
 
 function GameObject:Draw( pass )
 	local at = self.animation_type
-	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or at == e_animation.ball
+	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or e_animation.paddle_laser  or at == e_animation.ball
 	local shadow2 = at == e_animation.brick_colored or at == e_animation.brick_gold or at == e_animation.brick_silver
 
 	pass:setMaterial( self.animation.frames[ self.animation.frame_idx ] )
