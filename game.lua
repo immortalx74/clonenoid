@@ -121,7 +121,15 @@ metrics            = {
 	ball_constrain_right = 214,
 	ball_constrain_top = 24,
 	life_bar_left = 16,
-	life_bar_top = 252
+	life_bar_top = 252,
+	text_high_score_string_left = 112,
+	text_high_score_string_top = 4,
+	text_high_score_left = 112,
+	text_high_score_top = 12,
+	text_1up_left = 36,
+	text_1up_top = 4,
+	text_score_left = 48,
+	text_score_top = 12
 }
 
 levels             = {}
@@ -141,12 +149,49 @@ balls              = {}
 powerup            = { current = nil, dropping = nil, last_time = 0, interval = math.random( 4, 7 ), type = nil }
 mouse              = { position = lovr.math.newVec2( 0, 0 ), prev_frame = 0, this_frame = 0 }
 life_bar           = { total = 3, objects = {} }
+rasterizer         = lovr.data.newRasterizer( "res/font/Px437_IBM_EGA_8x8.ttf", 8 )
+font               = lovr.graphics.newFont( rasterizer )
+scores             = { high = 50000, player = 0 }
+oneup_last_time    = lovr.timer.getTime()
 
 local function IsMouseDown()
 	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
 		return true
 	end
 	return false
+end
+
+local function DrawScreenText( pass )
+	font:setPixelDensity( 1 )
+	pass:setFont( font )
+
+	pass:setColor( 1, 0, 0 )
+
+	if lovr.timer.getTime() - oneup_last_time >= 0.5 then
+		pass:text( "1UP", metrics.text_1up_left, metrics.text_1up_top, 1 )
+	end
+
+	if lovr.timer.getTime() - oneup_last_time >= 1 then
+		oneup_last_time = lovr.timer.getTime()
+	end
+
+	pass:text( "HIGH SCORE", metrics.text_high_score_string_left, metrics.text_high_score_string_top, 1 )
+
+	pass:setColor( 1, 1, 1 )
+
+	local hs = scores.high
+	if scores.player > scores.high then
+		hs = scores.player
+	end
+	pass:text( tostring( hs ), metrics.text_high_score_left, metrics.text_high_score_top, 1 )
+
+	if scores.player == 0 then
+		pass:text( "00", metrics.text_score_left, metrics.text_score_top, 1 )
+	else
+		local num_digits = math.floor( math.log( scores.player, 10 ) + 1 )
+		local p = ((num_digits * 8) / 2) - 8
+		pass:text( tostring( scores.player ), metrics.text_score_left - p, metrics.text_score_top, 1 )
+	end
 end
 
 local function Split( input )
@@ -171,7 +216,6 @@ end
 
 local function LoadTextures()
 	textures.bg = lovr.graphics.newTexture( "res/sprites/bg.png" )
-
 	textures.life = lovr.graphics.newTexture( "res/sprites/life.png" )
 
 	textures.bar_v_closed = lovr.graphics.newTexture( "res/sprites/bar_v_closed.png" )
@@ -509,6 +553,7 @@ function Game.Draw()
 
 	if game_state == e_game_state.play then
 		GameObject.DrawAll( game_pass )
+		DrawScreenText( game_pass )
 	end
 
 	return game_pass
