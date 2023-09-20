@@ -84,16 +84,16 @@ e_animation        = {
 local Game         = {}
 
 brick_type         = {
-	[ "w" ] = { anim = e_animation.brick_colored, frame = 1 },
-	[ "o" ] = { anim = e_animation.brick_colored, frame = 2 },
-	[ "c" ] = { anim = e_animation.brick_colored, frame = 3 },
-	[ "g" ] = { anim = e_animation.brick_colored, frame = 4 },
-	[ "r" ] = { anim = e_animation.brick_colored, frame = 5 },
-	[ "b" ] = { anim = e_animation.brick_colored, frame = 6 },
-	[ "p" ] = { anim = e_animation.brick_colored, frame = 7 },
-	[ "y" ] = { anim = e_animation.brick_colored, frame = 8 },
-	[ "s" ] = { anim = e_animation.brick_silver, frame = 1 },
-	[ "$" ] = { anim = e_animation.brick_gold, frame = 1 }
+	[ "w" ] = { anim = e_animation.brick_colored, frame = 1, points = 50 },
+	[ "o" ] = { anim = e_animation.brick_colored, frame = 2, points = 60 },
+	[ "c" ] = { anim = e_animation.brick_colored, frame = 3, points = 70 },
+	[ "g" ] = { anim = e_animation.brick_colored, frame = 4, points = 80 },
+	[ "r" ] = { anim = e_animation.brick_colored, frame = 5, points = 90 },
+	[ "b" ] = { anim = e_animation.brick_colored, frame = 6, points = 100 },
+	[ "p" ] = { anim = e_animation.brick_colored, frame = 7, points = 110 },
+	[ "y" ] = { anim = e_animation.brick_colored, frame = 8, points = 120 },
+	[ "s" ] = { anim = e_animation.brick_silver, frame = 1, points = 1 },
+	[ "$" ] = { anim = e_animation.brick_gold, frame = 1, points = 0 }
 }
 
 metrics            = {
@@ -275,6 +275,21 @@ local function GenerateLevel( idx )
 			local go = GameObject:New( e_object_type.brick, vec2( x, y ), brick_type[ level[ i ] ].anim )
 			go.animation:SetFrame( brick_type[ level[ i ] ].frame )
 			go.animation:SetPaused( true )
+			go.points = brick_type[ level[ i ] ].points
+
+			local silver_strength = 2
+			if level_idx % 8 == 0 then
+				local increase = math.floor( level_idx / 8 )
+				silver_strength = silver_strength + increase
+			end
+			if go.animation_type == e_animation.brick_silver then
+				go.strength = silver_strength
+				go.points = level_idx * 50
+			elseif go.animation_type == e_animation.brick_gold then
+				go.strength = 10000
+			elseif go.animation_type == e_animation.brick_colored then
+				go.strength = 1
+			end
 
 			x = x + metrics.brick_w
 		end
@@ -519,8 +534,18 @@ local function SetBallPos()
 
 				if xx > l and xx < r and yy > t and yy < b then
 					balls[ i ].velocity_y = -balls[ i ].velocity_y
-					DropPowerUp( v.position.x, v.position.y )
-					table.remove( game_objects, j )
+
+
+					v.strength = v.strength - 1
+					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
+						v.animation:SetPaused( false )
+					end
+
+					if v.strength == 0 then
+						DropPowerUp( v.position.x, v.position.y )
+						table.remove( game_objects, j )
+						scores.player = scores.player + v.points
+					end
 				end
 			end
 		end

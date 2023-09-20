@@ -23,9 +23,9 @@ function GameObject:New( type, position, animation_type )
 	elseif animation_type == e_animation.brick_colored then
 		obj.animation = Animation:New( 10, vec2( 16, 8 ), textures.bricks, 8, e_orientation.horizontal )
 	elseif animation_type == e_animation.brick_silver then
-		obj.animation = Animation:New( 30, vec2( 16, 8 ), textures.brick_silver, 6, e_orientation.horizontal )
+		obj.animation = Animation:New( 120, vec2( 16, 8 ), textures.brick_silver, 6, e_orientation.horizontal )
 	elseif animation_type == e_animation.brick_gold then
-		obj.animation = Animation:New( 30, vec2( 16, 8 ), textures.brick_gold, 6, e_orientation.horizontal )
+		obj.animation = Animation:New( 120, vec2( 16, 8 ), textures.brick_gold, 6, e_orientation.horizontal )
 	elseif animation_type == e_animation.ball then
 		obj.animation = Animation:New( 1, vec2( 4, 4 ), textures.ball, 1, e_orientation.horizontal )
 	elseif animation_type == e_animation.bar_h_l then
@@ -59,6 +59,12 @@ function GameObject:New( type, position, animation_type )
 end
 
 function GameObject:Update( dt )
+	if self.animation_type == e_animation.brick_silver or self.animation_type == e_animation.brick_gold then
+		if self.animation.frame_idx == 6 then
+			self.animation.frame_idx = 1
+			self.animation.paused = true
+		end
+	end
 	self.animation:Update( dt )
 end
 
