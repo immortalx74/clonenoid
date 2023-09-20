@@ -49,7 +49,8 @@ e_object_type      = {
 	decorative = 3,
 	brick = 4,
 	ball = 5,
-	powerup = 6
+	powerup = 6,
+	laser = 7
 }
 
 e_orientation      = {
@@ -78,7 +79,9 @@ e_animation        = {
 	bar_v_closed = 18,
 	bar_v_opening = 19,
 	bar_v_open = 20,
-	life = 21
+	life = 21,
+	laser = 22,
+	paddle_laser = 23
 }
 
 local Game         = {}
@@ -153,6 +156,7 @@ rasterizer         = lovr.data.newRasterizer( "res/font/Px437_IBM_EGA_8x8.ttf", 
 font               = lovr.graphics.newFont( rasterizer )
 scores             = { high = 50000, player = 0 }
 oneup_last_time    = lovr.timer.getTime()
+bullets            = {}
 
 local function IsMouseDown()
 	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
@@ -227,6 +231,7 @@ local function LoadTextures()
 
 	textures.paddle_normal = lovr.graphics.newTexture( "res/sprites/paddle_normal.png" )
 	textures.paddle_big = lovr.graphics.newTexture( "res/sprites/paddle_big.png" )
+	textures.paddle_laser = lovr.graphics.newTexture( "res/sprites/paddle_laser.png" )
 
 	textures.powerup_break = lovr.graphics.newTexture( "res/sprites/powerup_b.png" )
 	textures.powerup_laser = lovr.graphics.newTexture( "res/sprites/powerup_l.png" )
@@ -242,6 +247,8 @@ local function LoadTextures()
 	textures.brick_gold = lovr.graphics.newTexture( "res/sprites/brick_gold.png" )
 
 	textures.ball = lovr.graphics.newTexture( "res/sprites/ball.png" )
+
+	textures.laser = lovr.graphics.newTexture( "res/sprites/laser.png" )
 end
 
 local function DropPowerUp( x, y )
@@ -249,7 +256,7 @@ local function DropPowerUp( x, y )
 	if not powerup.dropping and lovr.timer.getTime() - powerup.last_time > powerup.interval then
 		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
 		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
-		powerup.type = e_animation.powerup_e
+		powerup.type = e_animation.powerup_l
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -313,6 +320,7 @@ local function GenerateLevel( idx )
 	-- Paddle
 	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_normal )
 	obj_paddle.prev_x = 0
+	obj_paddle.can_shoot = false
 
 	-- Ball
 	balls = {}
@@ -367,17 +375,72 @@ local function GetWindowScale()
 	return lovr.system.getWindowWidth() / 224
 end
 
+local function UpdateBullets()
+	for i, k in ipairs( bullets ) do
+		k.position.y = k.position.y - 4
+
+		if k.position.y < metrics.bar_h_l_top + 8 then
+			k.marked = true
+		end
+
+		local xx = k.position.x
+		local yy = k.position.y
+
+		-- Bricks collision
+		for j, v in ipairs( game_objects ) do
+			if v.type == e_object_type.brick then
+				local br_l = v.position.x - 8
+				local br_r = v.position.x + 8
+				local br_t = v.position.y - 4
+				local br_b = v.position.y + 4
+
+				local bul_l = xx - 8
+				local bul_r = xx + 8
+				local bul_t = yy - 4
+				local bul_b = yy + 4
+
+				if bul_l < br_r and bul_r > br_l and bul_t < br_b and bul_b > br_t then
+					k.marked = true
+					v.strength = v.strength - 1
+					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
+						v.animation:SetPaused( false )
+					end
+
+					if v.strength == 0 then
+						DropPowerUp( v.position.x, v.position.y )
+						table.remove( game_objects, j )
+						scores.player = scores.player + v.points
+					end
+				end
+			end
+		end
+	end
+
+	for i, v in ipairs( bullets ) do
+		if v.marked then
+			bullets[ i ]:Destroy()
+			table.remove( bullets, i )
+		end
+	end
+end
+
 local function UpdatePowerUp()
 	-- Powerup position
 	if powerup.dropping then
+		local half_size = 16
+		if obj_paddle.animation_type == e_animation.paddle_big then
+			half_size = 24
+		end
+
 		powerup.dropping.position.y = powerup.dropping.position.y + 1
 		-- Powerup went off screen
 		if powerup.dropping.position.y > window.h then
 			powerup.dropping:Destroy()
 			powerup.dropping = nil
 			powerup.last_time = lovr.timer.getTime()
+
 			-- Powerup -> paddle collision
-		elseif powerup.dropping.position.x > obj_paddle.position.x - 16 and powerup.dropping.position.x < obj_paddle.position.x + 16 then
+		elseif powerup.dropping.position.x > obj_paddle.position.x - half_size and powerup.dropping.position.x < obj_paddle.position.x + half_size then
 			if powerup.dropping.position.y > obj_paddle.position.y - 4 then
 				powerup.current = powerup.dropping
 
@@ -394,6 +457,11 @@ local function UpdatePowerUp()
 					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_big )
 					obj_paddle.prev_x = 0
 				elseif powerup.type == e_animation.powerup_l then
+					obj_paddle:Destroy()
+					obj_paddle = nil
+					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_laser )
+					obj_paddle.prev_x = 0
+					obj_paddle.can_shoot = true
 				elseif powerup.type == e_animation.powerup_p then
 					local left = metrics.life_bar_left + ((life_bar.total - 1) * 16)
 					local l = GameObject:New( e_object_type.decorative, vec2( left, metrics.life_bar_top ), e_animation.life )
@@ -440,6 +508,13 @@ local function SetPaddlePos()
 		if obj_paddle.position.x > constrain_right then
 			obj_paddle.position.x = constrain_right
 		end
+	end
+
+	-- Shoot
+	if IsMouseDown() and obj_paddle.can_shoot then
+		local b = GameObject:New( e_object_type.laser, vec2( obj_paddle.position ), e_animation.laser )
+		b.animation:SetPaused( true )
+		table.insert( bullets, b )
 	end
 
 	-- Exit from gate
@@ -566,6 +641,7 @@ function Game.Update( dt )
 	GetWindowPos()
 	GetMousePos()
 	GameObject.UpdateAll( dt )
+	UpdateBullets()
 
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
