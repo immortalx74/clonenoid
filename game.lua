@@ -1,5 +1,6 @@
 local GameObject = require "gameobject"
 local Animation = require "animation"
+local Timer = require "timer"
 local io = require "io"
 local ffi = require "ffi"
 local glfw = ffi.load( "glfw3" )
@@ -40,7 +41,8 @@ GLFW_CURSOR_HIDDEN = 0x00034002
 
 local e_game_state = {
 	play = 1,
-	generate_level = 2
+	generate_level = 2,
+	level_intro = 3
 }
 
 e_object_type      = {
@@ -132,7 +134,8 @@ metrics            = {
 	text_1up_left = 36,
 	text_1up_top = 4,
 	text_score_left = 48,
-	text_score_top = 12
+	text_score_top = 12,
+	text_level_intro_top = 180
 }
 
 levels             = {}
@@ -149,14 +152,15 @@ obj_paddle         = nil
 obj_ball           = nil
 obj_gate           = nil
 balls              = {}
-powerup            = { current = nil, dropping = nil, last_time = 0, interval = math.random( 4, 7 ), type = nil }
+powerup            = { current = nil, dropping = nil, interval = math.random( 4, 7 ), type = nil }
 mouse              = { position = lovr.math.newVec2( 0, 0 ), prev_frame = 0, this_frame = 0 }
-life_bar           = { total = 3, objects = {} }
+life_bar           = { total = 3, objects = {}, max = 6 }
 rasterizer         = lovr.data.newRasterizer( "res/font/Px437_IBM_EGA_8x8.ttf", 8 )
 font               = lovr.graphics.newFont( rasterizer )
 scores             = { high = 50000, player = 0 }
-oneup_last_time    = lovr.timer.getTime()
 bullets            = {}
+timers             = {}
+sounds             = {}
 
 local function IsMouseDown()
 	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
@@ -171,12 +175,12 @@ local function DrawScreenText( pass )
 
 	pass:setColor( 1, 0, 0 )
 
-	if lovr.timer.getTime() - oneup_last_time >= 0.5 then
+	if timers.oneup:GetElapsed() >= 0.5 then
 		pass:text( "1UP", metrics.text_1up_left, metrics.text_1up_top, 1 )
 	end
 
-	if lovr.timer.getTime() - oneup_last_time >= 1 then
-		oneup_last_time = lovr.timer.getTime()
+	if timers.oneup:GetElapsed() >= 1 then
+		timers.oneup:Reset()
 	end
 
 	pass:text( "HIGH SCORE", metrics.text_high_score_string_left, metrics.text_high_score_string_top, 1 )
@@ -195,6 +199,24 @@ local function DrawScreenText( pass )
 		local num_digits = math.floor( math.log( scores.player, 10 ) + 1 )
 		local p = ((num_digits * 8) / 2) - 8
 		pass:text( tostring( scores.player ), metrics.text_score_left - p, metrics.text_score_top, 1 )
+	end
+
+	if game_state == e_game_state.level_intro then
+		pass:setColor( 1, 1, 1 )
+		local str = "ROUND  "
+		if level_idx > 9 then
+			str = "ROUND "
+		end
+		pass:text( str .. tostring( level_idx ), window.w / 2, metrics.text_level_intro_top, 1 )
+
+		if timers.level_intro:GetElapsed() > 1 then
+			pass:text( "READY", window.w / 2, metrics.text_level_intro_top + 16, 1 )
+		end
+
+		if timers.level_intro:GetElapsed() > 2 then
+			timers.balls[ 1 ]:Reset()
+			game_state = e_game_state.play
+		end
 	end
 end
 
@@ -251,12 +273,23 @@ local function LoadTextures()
 	textures.laser = lovr.graphics.newTexture( "res/sprites/laser.png" )
 end
 
+local function LoadSounds()
+	sounds.ball_brick_destroy = lovr.audio.newSource( "res/sounds/ball_brick_destroy.wav" )
+	sounds.ball_brick_ding = lovr.audio.newSource( "res/sounds/ball_brick_ding.wav" )
+	sounds.ball_to_paddle = lovr.audio.newSource( "res/sounds/ball_to_paddle.wav" )
+	sounds.ball_to_paddle_stick = lovr.audio.newSource( "res/sounds/ball_to_paddle_stick.wav" )
+	sounds.enemy_destroy = lovr.audio.newSource( "res/sounds/enemy_destroy.wav" )
+	sounds.got_life = lovr.audio.newSource( "res/sounds/got_life.wav" )
+	sounds.laser_shoot = lovr.audio.newSource( "res/sounds/laser_shoot.wav" )
+	sounds.level_intro = lovr.audio.newSource( "res/sounds/level_intro.wav" )
+end
+
 local function DropPowerUp( x, y )
 	-- Drop random powerup
-	if not powerup.dropping and lovr.timer.getTime() - powerup.last_time > powerup.interval then
+	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
 		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
 		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
-		powerup.type = e_animation.powerup_l
+		powerup.type = e_animation.powerup_p
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -329,7 +362,6 @@ local function GenerateLevel( idx )
 	b.velocity_x = 2
 	b.velocity_y = 2
 	b.sticky = true
-	b.last_time = lovr.timer.getTime()
 	table.insert( balls, b )
 
 	-- Life bar
@@ -340,9 +372,9 @@ local function GenerateLevel( idx )
 		left = left + 16
 	end
 
-	powerup.last_time = lovr.timer.getTime()
-
-	game_state = e_game_state.play
+	timers.powerup:Reset()
+	timers.level_intro:Reset()
+	game_state = e_game_state.level_intro
 end
 
 local function GetWindowPos()
@@ -447,7 +479,7 @@ local function UpdatePowerUp()
 		if powerup.dropping.position.y > window.h then
 			powerup.dropping:Destroy()
 			powerup.dropping = nil
-			powerup.last_time = lovr.timer.getTime()
+			timers.powerup:Reset()
 
 			-- Powerup -> paddle collision
 		elseif powerup.dropping.position.x > obj_paddle.position.x - half_size and powerup.dropping.position.x < obj_paddle.position.x + half_size then
@@ -460,6 +492,9 @@ local function UpdatePowerUp()
 					obj_gate = nil
 					obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_opening )
 				elseif powerup.type == e_animation.powerup_c then
+					for i, v in ipairs( balls ) do
+						v.sticky = true
+					end
 				elseif powerup.type == e_animation.powerup_d then
 				elseif powerup.type == e_animation.powerup_e then
 					obj_paddle:Destroy()
@@ -473,16 +508,20 @@ local function UpdatePowerUp()
 					obj_paddle.prev_x = 0
 					obj_paddle.can_shoot = true
 				elseif powerup.type == e_animation.powerup_p then
-					local left = metrics.life_bar_left + ((life_bar.total - 1) * 16)
-					local l = GameObject:New( e_object_type.decorative, vec2( left, metrics.life_bar_top ), e_animation.life )
-					life_bar.total = life_bar.total + 1
+					if life_bar.total < life_bar.max then
+						local left = metrics.life_bar_left + ((life_bar.total - 1) * 16)
+						local l = GameObject:New( e_object_type.decorative, vec2( left, metrics.life_bar_top ), e_animation.life )
+						life_bar.total = life_bar.total + 1
+					end
 					powerup.current = nil
+					sounds.got_life:stop()
+					sounds.got_life:play()
 				elseif powerup.type == e_animation.powerup_s then
 
 				end
 				powerup.dropping:Destroy()
 				powerup.dropping = nil
-				powerup.last_time = lovr.timer.getTime()
+				timers.powerup:Reset()
 			end
 		end
 	end
@@ -525,6 +564,8 @@ local function SetPaddlePos()
 		local b = GameObject:New( e_object_type.laser, vec2( obj_paddle.position ), e_animation.laser )
 		b.animation:SetPaused( true )
 		table.insert( bullets, b )
+		sounds.laser_shoot:stop()
+		sounds.laser_shoot:play()
 	end
 
 	-- Exit from gate
@@ -535,16 +576,23 @@ local function SetPaddlePos()
 	obj_paddle.prev_x = obj_paddle.position.x
 end
 
+-- TODO fix sticky
 local function SetBallPos()
 	-- Ball[s] position
 	for i = 1, #balls do
 		if balls[ i ].sticky then
 			balls[ i ].position.x = obj_paddle.position.x
 			balls[ i ].position.y = obj_paddle.position.y - 8
-			if IsMouseDown() or lovr.timer.getTime() - balls[ i ].last_time > 2 then
-				balls[ i ].sticky = false
-				balls[ i ].velocity_x = 2
-				balls[ i ].velocity_y = -2
+			if game_state == e_game_state.play then
+				if IsMouseDown() or timers.balls[ i ]:GetElapsed() > 2 then
+					balls[ i ].sticky = false
+					balls[ i ].velocity_x = 2
+					balls[ i ].velocity_y = -2
+					if IsMouseDown() then
+						sounds.ball_to_paddle:stop()
+						sounds.ball_to_paddle:play()
+					end
+				end
 			end
 		else
 			balls[ i ].position.x = balls[ i ].position.x + balls[ i ].velocity_x
@@ -580,7 +628,9 @@ local function SetBallPos()
 		if balls[ i ].position.x > obj_paddle.position.x - half_size and balls[ i ].position.x < obj_paddle.position.x + half_size then
 			if balls[ i ].position.y > obj_paddle.position.y - 4 then
 				balls[ i ].velocity_y = -balls[ i ].velocity_y
-
+				sounds.ball_to_paddle:stop()
+				sounds.ball_to_paddle:play()
+				print( life_bar.total )
 				local dir = 0
 
 				if obj_paddle.position.x > obj_paddle.prev_x then
@@ -624,9 +674,16 @@ local function SetBallPos()
 					v.strength = v.strength - 1
 					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
 						v.animation:SetPaused( false )
+
+						if v.strength > 0 then
+							sounds.ball_brick_ding:stop()
+							sounds.ball_brick_ding:play()
+						end
 					end
 
 					if v.strength == 0 then
+						sounds.ball_brick_destroy:stop()
+						sounds.ball_brick_destroy:play()
 						DropPowerUp( v.position.x, v.position.y )
 						table.remove( game_objects, j )
 						scores.player = scores.player + v.points
@@ -641,10 +698,16 @@ function Game.Init()
 	lovr.graphics.setBackgroundColor( 0, 0, 0 )
 	LoadLevels()
 	LoadTextures()
+	LoadSounds()
 
 	window.handle = ffi.C.os_get_glfw_window()
 	glfw.glfwSetInputMode( window.handle, GLFW_CURSOR, GLFW_CURSOR_HIDDEN )
 	math.randomseed( os.time() )
+
+	timers.oneup = Timer:New( true )
+	timers.powerup = Timer:New()
+	timers.level_intro = Timer:New()
+	timers.balls = { Timer:New(), Timer:New(), Timer:New() }
 end
 
 function Game.Update( dt )
@@ -655,6 +718,10 @@ function Game.Update( dt )
 
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
+	elseif game_state == e_game_state.level_intro then
+		sounds.level_intro:play()
+		SetPaddlePos()
+		SetBallPos()
 	elseif game_state == e_game_state.play then
 		UpdatePowerUp()
 		SetPaddlePos()
@@ -667,9 +734,12 @@ function Game.Draw()
 	game_pass:setProjection( 1, mat4():orthographic( game_pass:getDimensions() ) )
 	game_pass:setSampler( sampler )
 
+	GameObject.DrawAll( game_pass )
+	DrawScreenText( game_pass )
+
 	if game_state == e_game_state.play then
-		GameObject.DrawAll( game_pass )
-		DrawScreenText( game_pass )
+	elseif game_state == e_game_state.level_intro then
+
 	end
 
 	return game_pass
