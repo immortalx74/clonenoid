@@ -22,6 +22,8 @@ function GameObject:New( type, position, animation_type )
 		obj.animation = Animation:New( 30, vec2( 48, 8 ), textures.paddle_big, 6, e_orientation.vertical )
 	elseif animation_type == e_animation.paddle_laser then
 		obj.animation = Animation:New( 30, vec2( 32, 8 ), textures.paddle_laser, 6, e_orientation.vertical )
+	elseif animation_type == e_animation.paddle_appear then
+		obj.animation = Animation:New( 30, vec2( 32, 8 ), textures.paddle_appear, 5, e_orientation.vertical )
 	elseif animation_type == e_animation.brick_colored then
 		obj.animation = Animation:New( 10, vec2( 16, 8 ), textures.bricks, 8, e_orientation.horizontal )
 	elseif animation_type == e_animation.brick_silver then

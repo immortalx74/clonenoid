@@ -212,11 +212,6 @@ local function DrawScreenText( pass )
 		if timers.level_intro:GetElapsed() > 1 then
 			pass:text( "READY", window.w / 2, metrics.text_level_intro_top + 16, 1 )
 		end
-
-		if timers.level_intro:GetElapsed() > 2 then
-			timers.balls[ 1 ]:Reset()
-			game_state = e_game_state.play
-		end
 	end
 end
 
@@ -254,6 +249,7 @@ local function LoadTextures()
 	textures.paddle_normal = lovr.graphics.newTexture( "res/sprites/paddle_normal.png" )
 	textures.paddle_big = lovr.graphics.newTexture( "res/sprites/paddle_big.png" )
 	textures.paddle_laser = lovr.graphics.newTexture( "res/sprites/paddle_laser.png" )
+	textures.paddle_appear = lovr.graphics.newTexture( "res/sprites/paddle_appear.png" )
 
 	textures.powerup_break = lovr.graphics.newTexture( "res/sprites/powerup_b.png" )
 	textures.powerup_laser = lovr.graphics.newTexture( "res/sprites/powerup_l.png" )
@@ -282,6 +278,7 @@ local function LoadSounds()
 	sounds.got_life = lovr.audio.newSource( "res/sounds/got_life.wav" )
 	sounds.laser_shoot = lovr.audio.newSource( "res/sounds/laser_shoot.wav" )
 	sounds.level_intro = lovr.audio.newSource( "res/sounds/level_intro.wav" )
+	sounds.paddle_turn_big = lovr.audio.newSource( "res/sounds/paddle_turn_big.wav" )
 end
 
 local function DropPowerUp( x, y )
@@ -289,7 +286,7 @@ local function DropPowerUp( x, y )
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
 		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
 		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
-		powerup.type = e_animation.powerup_p
+		powerup.type = e_animation.powerup_l
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -302,6 +299,7 @@ local function GenerateLevel( idx )
 
 	-- Bricks
 	local level = levels[ level_idx ]
+	level.num_destroyable_bricks = 0
 	local x = metrics.wall_start_left
 	local y = metrics.wall_start_top
 
@@ -325,10 +323,12 @@ local function GenerateLevel( idx )
 			if go.animation_type == e_animation.brick_silver then
 				go.strength = silver_strength
 				go.points = level_idx * 50
+				level.num_destroyable_bricks = level.num_destroyable_bricks + 1
 			elseif go.animation_type == e_animation.brick_gold then
 				go.strength = 10000
 			elseif go.animation_type == e_animation.brick_colored then
 				go.strength = 1
+				level.num_destroyable_bricks = level.num_destroyable_bricks + 1
 			end
 
 			x = x + metrics.brick_w
@@ -350,14 +350,11 @@ local function GenerateLevel( idx )
 	obj_gate.animation:SetFrame( 1 )
 	obj_gate.animation:SetPaused( true )
 
-	-- Paddle
-	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_normal )
-	obj_paddle.prev_x = 0
-	obj_paddle.can_shoot = false
+	-- Paddle (start with appear animation)
+	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_appear )
 
 	-- Ball
 	balls = {}
-	-- local b = GameObject:New( e_object_type.ball, vec2( 100, 180 ), e_animation.ball )
 	local b = GameObject:New( e_object_type.ball, vec2( window.w / 2, metrics.paddle_y - 8 ), e_animation.ball )
 	b.velocity_x = 2
 	b.velocity_y = 2
@@ -445,6 +442,7 @@ local function UpdateBullets()
 						DropPowerUp( v.position.x, v.position.y )
 						table.remove( game_objects, j )
 						scores.player = scores.player + v.points
+						levels[ level_idx ].num_destroyable_bricks = levels[ level_idx ].num_destroyable_bricks - 1
 					end
 				end
 			end
@@ -501,6 +499,8 @@ local function UpdatePowerUp()
 					obj_paddle = nil
 					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_big )
 					obj_paddle.prev_x = 0
+					sounds.paddle_turn_big:stop()
+					sounds.paddle_turn_big:play()
 				elseif powerup.type == e_animation.powerup_l then
 					obj_paddle:Destroy()
 					obj_paddle = nil
@@ -630,7 +630,7 @@ local function SetBallPos()
 				balls[ i ].velocity_y = -balls[ i ].velocity_y
 				sounds.ball_to_paddle:stop()
 				sounds.ball_to_paddle:play()
-				print( life_bar.total )
+
 				local dir = 0
 
 				if obj_paddle.position.x > obj_paddle.prev_x then
@@ -669,8 +669,6 @@ local function SetBallPos()
 
 				if xx > l and xx < r and yy > t and yy < b then
 					balls[ i ].velocity_y = -balls[ i ].velocity_y
-
-
 					v.strength = v.strength - 1
 					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
 						v.animation:SetPaused( false )
@@ -687,6 +685,7 @@ local function SetBallPos()
 						DropPowerUp( v.position.x, v.position.y )
 						table.remove( game_objects, j )
 						scores.player = scores.player + v.points
+						levels[ level_idx ].num_destroyable_bricks = levels[ level_idx ].num_destroyable_bricks - 1
 					end
 				end
 			end
@@ -719,13 +718,32 @@ function Game.Update( dt )
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
 	elseif game_state == e_game_state.level_intro then
+		sounds.level_intro:setLooping( false )
 		sounds.level_intro:play()
 		SetPaddlePos()
 		SetBallPos()
+
+		if obj_paddle.animation_type == e_animation.paddle_appear and obj_paddle.animation:GetFrame() == 5 then
+			obj_paddle:Destroy()
+			obj_paddle = nil
+			obj_paddle = GameObject:New( e_object_type.paddle, vec2( mouse.position.x, metrics.paddle_y ), e_animation.paddle_normal )
+			obj_paddle.prev_x = 0
+			obj_paddle.can_shoot = false
+		end
+
+		local duration = sounds.level_intro:getDuration( "frames" )
+		if sounds.level_intro:tell( "frames" ) >= duration - 70000 then
+			timers.balls[ 1 ]:Reset()
+			game_state = e_game_state.play
+		end
 	elseif game_state == e_game_state.play then
 		UpdatePowerUp()
 		SetPaddlePos()
 		SetBallPos()
+		if levels[ level_idx ].num_destroyable_bricks == 0 then
+			level_idx = level_idx + 1
+			game_state = e_game_state.generate_level
+		end
 	end
 end
 
