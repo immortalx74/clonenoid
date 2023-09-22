@@ -146,7 +146,7 @@ window             = { w = 224, h = 256, x = 0, y = 0, handle = nil }
 game_texture       = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
 
 game_state         = e_game_state.generate_level
-level_idx          = 1
+level_idx          = 10
 sampler            = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle         = nil
 obj_ball           = nil
@@ -286,15 +286,25 @@ local function DropPowerUp( x, y )
 	-- Drop random powerup
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
 		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
-		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
-		powerup.type = e_animation.powerup_b
+		powerup.type = e_animation.powerup_l
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
 
 local function GenerateLevel( idx )
+	powerup      = { current = nil, dropping = nil, interval = math.random( 4, 7 ), type = nil }
+	game_objects = nil
+	game_objects = {}
+	bullets      = nil
+	bullets      = {}
+	balls        = nil
+	balls        = {}
+	obj_paddle   = nil
+	obj_ball     = nil
+	obj_gate     = nil
+
 	-- background
-	local bg = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
+	local bg     = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
 	local bg_idx = level_idx % 4
 	if bg_idx == 0 then
 		bg_idx = 1
