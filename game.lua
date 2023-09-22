@@ -279,6 +279,7 @@ local function LoadSounds()
 	sounds.laser_shoot = lovr.audio.newSource( "res/sounds/laser_shoot.wav" )
 	sounds.level_intro = lovr.audio.newSource( "res/sounds/level_intro.wav" )
 	sounds.paddle_turn_big = lovr.audio.newSource( "res/sounds/paddle_turn_big.wav" )
+	sounds.escape_level = lovr.audio.newSource( "res/sounds/escape_level.wav" )
 end
 
 local function DropPowerUp( x, y )
@@ -286,7 +287,7 @@ local function DropPowerUp( x, y )
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
 		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
 		-- powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
-		powerup.type = e_animation.powerup_l
+		powerup.type = e_animation.powerup_b
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -294,7 +295,11 @@ end
 local function GenerateLevel( idx )
 	-- background
 	local bg = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
-	bg.animation:SetFrame( level_idx % 4 )
+	local bg_idx = level_idx % 4
+	if bg_idx == 0 then
+		bg_idx = 1
+	end
+	bg.animation:SetFrame( bg_idx )
 	bg.animation:SetPaused( true )
 
 	-- Bricks
@@ -330,9 +335,8 @@ local function GenerateLevel( idx )
 				go.strength = 1
 				level.num_destroyable_bricks = level.num_destroyable_bricks + 1
 			end
-
-			x = x + metrics.brick_w
 		end
+		x = x + metrics.brick_w
 	end
 
 	-- Side and top bars
@@ -569,8 +573,11 @@ local function SetPaddlePos()
 	end
 
 	-- Exit from gate
-	if obj_paddle.position.x > window.w + 16 then
+	if obj_paddle.position.x > window.w - 16 and not obj_paddle.begin_exit then
 		print( "exit" )
+		obj_paddle.begin_exit = true
+		sounds.escape_level:stop()
+		sounds.escape_level:play()
 	end
 
 	obj_paddle.prev_x = obj_paddle.position.x
@@ -738,8 +745,19 @@ function Game.Update( dt )
 		end
 	elseif game_state == e_game_state.play then
 		UpdatePowerUp()
-		SetPaddlePos()
-		SetBallPos()
+
+		if obj_paddle.begin_exit then
+			obj_paddle.position.x = obj_paddle.position.x + 1
+			local duration = sounds.escape_level:getDuration( "frames" )
+			if sounds.escape_level:tell( "frames" ) >= duration - 70000 then
+				level_idx = level_idx + 1
+				game_state = e_game_state.generate_level
+			end
+		else
+			SetPaddlePos()
+			SetBallPos()
+		end
+
 		if levels[ level_idx ].num_destroyable_bricks == 0 then
 			level_idx = level_idx + 1
 			game_state = e_game_state.generate_level

@@ -76,9 +76,8 @@ end
 
 function GameObject:Draw( pass )
 	local at = self.animation_type
-	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or e_animation.paddle_laser  or at == e_animation.ball
+	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or at == e_animation.paddle_laser  or at == e_animation.ball
 	local shadow2 = at == e_animation.brick_colored or at == e_animation.brick_gold or at == e_animation.brick_silver
-
 	pass:setMaterial( self.animation.frames[ self.animation.frame_idx ] )
 	if shadow1 or shadow2 then
 		pass:setColor( 0, 0, 0, 1 )
