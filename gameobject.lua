@@ -56,6 +56,12 @@ function GameObject:New( type, position, animation_type )
 		obj.animation = Animation:New( 1, vec2( 16, 8 ), textures.life, 1, e_orientation.horizontal )
 	elseif animation_type == e_animation.laser then
 		obj.animation = Animation:New( 60, vec2( 16, 8 ), textures.laser, 4, e_orientation.vertical )
+	elseif animation_type == e_animation.arkanoid_logo then
+		obj.animation = Animation:New( 1, vec2( 218, 48 ), textures.arkanoid_logo, 1, e_orientation.horizontal )
+	elseif animation_type == e_animation.taito_logo then
+		obj.animation = Animation:New( 1, vec2( 96, 14 ), textures.taito_logo, 1, e_orientation.horizontal )
+	elseif animation_type == e_animation.mothership then
+		obj.animation = Animation:New( 30, vec2( 192, 88 ), textures.mothership, 5, e_orientation.vertical )
 	end
 	obj.animation_type = animation_type
 	obj.animation.time_prev = lovr.timer.getTime()

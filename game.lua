@@ -1,6 +1,7 @@
 local GameObject = require "gameobject"
 local Animation = require "animation"
 local Timer = require "timer"
+local TypeWriter = require "typewriter"
 local io = require "io"
 local ffi = require "ffi"
 local glfw = ffi.load( "glfw3" )
@@ -39,10 +40,12 @@ ffi.cdef( [[
 GLFW_CURSOR        = 0x00033001
 GLFW_CURSOR_HIDDEN = 0x00034002
 
-local e_game_state = {
+e_game_state       = {
 	play = 1,
 	generate_level = 2,
-	level_intro = 3
+	level_intro = 3,
+	main_screen = 4,
+	story = 5
 }
 
 e_object_type      = {
@@ -83,7 +86,10 @@ e_animation        = {
 	bar_v_open = 20,
 	life = 21,
 	laser = 22,
-	paddle_laser = 23
+	paddle_laser = 23,
+	arkanoid_logo = 24,
+	taito_logo = 25,
+	mothership = 26
 }
 
 local Game         = {}
@@ -135,7 +141,13 @@ metrics            = {
 	text_1up_top = 4,
 	text_score_left = 48,
 	text_score_top = 12,
-	text_level_intro_top = 180
+	text_level_intro_top = 180,
+	arkanoid_logo_top = 70,
+	taito_logo_top = 185,
+	text_copyright_top = 208,
+	text_main_screen_msg = 112,
+	mothership_top = 196,
+	text_story_top = 26
 }
 
 levels             = {}
@@ -145,8 +157,8 @@ animations         = {}
 window             = { w = 224, h = 256, x = 0, y = 0, handle = nil }
 game_texture       = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
 
-game_state         = e_game_state.generate_level
-level_idx          = 10
+game_state         = e_game_state.main_screen
+level_idx          = 1
 sampler            = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle         = nil
 obj_ball           = nil
@@ -155,18 +167,35 @@ balls              = {}
 powerup            = { current = nil, dropping = nil, interval = math.random( 4, 7 ), type = nil }
 mouse              = { position = lovr.math.newVec2( 0, 0 ), prev_frame = 0, this_frame = 0 }
 life_bar           = { total = 3, objects = {}, max = 6 }
-rasterizer         = lovr.data.newRasterizer( "res/font/Px437_IBM_EGA_8x8.ttf", 8 )
+rasterizer         = lovr.data.newRasterizer( "res/font/PressStart2P-Regular.ttf", 8 )
 font               = lovr.graphics.newFont( rasterizer )
 scores             = { high = 50000, player = 0 }
 bullets            = {}
 timers             = {}
 sounds             = {}
+story_text         = {}
 
 local function IsMouseDown()
 	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
 		return true
 	end
 	return false
+end
+
+function lovr.keypressed( key, scancode, repeating )
+	if game_state == e_game_state.main_screen then
+		if key == "space" then
+			obj_arkanoid_logo:Destroy()
+			obj_arkanoid_logo = nil
+			obj_taito_logo:Destroy()
+			obj_taito_logo = nil
+			obj_mothership = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.mothership_top ), e_animation.mothership )
+			sounds.mothership_intro:stop()
+			sounds.mothership_intro:play()
+			timers.typewriter:Reset()
+			game_state = e_game_state.story
+		end
+	end
 end
 
 local function DrawScreenText( pass )
@@ -212,6 +241,56 @@ local function DrawScreenText( pass )
 		if timers.level_intro:GetElapsed() > 1 then
 			pass:text( "READY", window.w / 2, metrics.text_level_intro_top + 16, 1 )
 		end
+	elseif game_state == e_game_state.main_screen then
+		pass:setColor( 1, 1, 1 )
+
+		pass:text( "A FREE OPEN-SOURCE PORT", window.w / 2, metrics.text_main_screen_msg, 1 )
+		pass:text( "OF THE ARCADE VERSION", window.w / 2, metrics.text_main_screen_msg + 16, 1 )
+		pass:text( "MADE WITH LÖVR (lovr.org)", window.w / 2, metrics.text_main_screen_msg + 32, 1 )
+
+
+		if timers.press_space:GetElapsed() >= 0.5 then
+			pass:setColor( 1, 0, 0 )
+			pass:text( "[PRESS SPACE TO START]", window.w / 2, metrics.text_main_screen_msg + 48, 1 )
+		end
+
+		if timers.press_space:GetElapsed() >= 1 then
+			timers.press_space:Reset()
+		end
+
+		pass:setColor( 1, 1, 1 )
+		pass:text( "© 1986 TAITO CORP JAPAN", window.w / 2, metrics.text_copyright_top, 1 )
+		pass:text( "ALL RIGHTS RESERVED", window.w / 2, metrics.text_copyright_top + 16, 1 )
+	elseif game_state == e_game_state.story then
+		for i, v in ipairs( story_text[ story_text.paragraph ] ) do
+			v:Draw( pass )
+			if v:HasFinished() then
+				if story_text[ story_text.paragraph ][ i + 1 ] then
+					story_text[ story_text.paragraph ][ i + 1 ]:Start()
+				else
+					if not story_text.paragraph_finished then
+						story_text.paragraph_finished = true
+						timers.paragraph_end:Reset()
+					end
+
+					if timers.paragraph_end:GetElapsed() > 0.5 then
+						story_text.paragraph = story_text.paragraph + 1
+						story_text.paragraph_finished = false
+						timers.paragraph_end:Reset()
+
+						if story_text.paragraph == 3 then
+							sounds.paddle_away:stop()
+							sounds.paddle_away:play()
+						end
+					end
+
+					if story_text.paragraph > 3 then
+						story_text.paragraph = 1
+						game_state = e_game_state.generate_level
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -237,7 +316,10 @@ end
 
 local function LoadTextures()
 	textures.bg = lovr.graphics.newTexture( "res/sprites/bg.png" )
+	textures.arkanoid_logo = lovr.graphics.newTexture( "res/sprites/arkanoid_logo.png" )
+	textures.taito_logo = lovr.graphics.newTexture( "res/sprites/taito_logo.png" )
 	textures.life = lovr.graphics.newTexture( "res/sprites/life.png" )
+	textures.mothership = lovr.graphics.newTexture( "res/sprites/mothership.png" )
 
 	textures.bar_v_closed = lovr.graphics.newTexture( "res/sprites/bar_v_closed.png" )
 	textures.bar_v_opening = lovr.graphics.newTexture( "res/sprites/bar_v_opening.png" )
@@ -280,6 +362,8 @@ local function LoadSounds()
 	sounds.level_intro = lovr.audio.newSource( "res/sounds/level_intro.wav" )
 	sounds.paddle_turn_big = lovr.audio.newSource( "res/sounds/paddle_turn_big.wav" )
 	sounds.escape_level = lovr.audio.newSource( "res/sounds/escape_level.wav" )
+	sounds.mothership_intro = lovr.audio.newSource( "res/sounds/mothership_intro.wav" )
+	sounds.paddle_away = lovr.audio.newSource( "res/sounds/paddle_away.wav" )
 end
 
 local function DropPowerUp( x, y )
@@ -720,10 +804,37 @@ function Game.Init()
 	glfw.glfwSetInputMode( window.handle, GLFW_CURSOR, GLFW_CURSOR_HIDDEN )
 	math.randomseed( os.time() )
 
-	timers.oneup = Timer:New( true )
-	timers.powerup = Timer:New()
-	timers.level_intro = Timer:New()
-	timers.balls = { Timer:New(), Timer:New(), Timer:New() }
+	timers.typewriter    = Timer:New()
+	timers.paragraph_end = Timer:New()
+	timers.press_space   = Timer:New( true )
+	timers.oneup         = Timer:New( true )
+	timers.powerup       = Timer:New()
+	timers.level_intro   = Timer:New()
+	timers.balls         = { Timer:New(), Timer:New(), Timer:New() }
+
+	obj_arkanoid_logo    = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.arkanoid_logo_top ), e_animation.arkanoid_logo )
+	obj_taito_logo       = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.taito_logo_top ), e_animation.taito_logo )
+
+	story_text           = {
+		paragraph = 1,
+		paragraph_finished = false,
+		{
+			TypeWriter:New( "THE ERA AND TIME OF", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( "THIS STORY IS UNKNOWN.", vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 )
+		},
+		{
+			TypeWriter:New( "AFTER THE MOTHERSHIP", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( '"ARKANOID" WAS DESTROYED,', vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 ),
+			TypeWriter:New( 'A SPACECRAFT "VAUS"', vec2( 8, metrics.text_story_top + 32 ), timers.typewriter, 0.02 ),
+			TypeWriter:New( "SCRAMBLED AWAY FROM IT.", vec2( 8, metrics.text_story_top + 48 ), timers.typewriter, 0.02 )
+		},
+		{
+			TypeWriter:New( "BUT ONLY TO BE", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( "TRAPPED IN SPACE WARPED", vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 ),
+			TypeWriter:New( "BY SOMEONE........", vec2( 8, metrics.text_story_top + 32 ), timers.typewriter, 0.02 ),
+		}
+
+	}
 end
 
 function Game.Update( dt )
@@ -734,6 +845,8 @@ function Game.Update( dt )
 
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
+	elseif game_state == e_game_state.main_screen then
+
 	elseif game_state == e_game_state.level_intro then
 		sounds.level_intro:setLooping( false )
 		sounds.level_intro:play()
