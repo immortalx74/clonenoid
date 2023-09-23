@@ -82,16 +82,22 @@ end
 
 function GameObject:Draw( pass )
 	local at = self.animation_type
-	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or at == e_animation.paddle_laser  or at == e_animation.ball
+	local shadow1 = at == e_animation.paddle_normal or at == e_animation.paddle_big or at == e_animation.paddle_laser or at == e_animation.ball
 	local shadow2 = at == e_animation.brick_colored or at == e_animation.brick_gold or at == e_animation.brick_silver
+	local shadow3 = at == e_animation.powerup_b or at == e_animation.powerup_c or at == e_animation.powerup_d or at == e_animation.powerup_e or
+		at == e_animation.powerup_l or at == e_animation.powerup_p or at == e_animation.powerup_s
 	pass:setMaterial( self.animation.frames[ self.animation.frame_idx ] )
-	if shadow1 or shadow2 then
+	if shadow1 or shadow2 or shadow3 then
 		pass:setColor( 0, 0, 0, 1 )
 		local offset = 4
 
 		if shadow2 then
 			pass:setColor( 0, 0, 0, 0.5 )
 			offset = 8
+		end
+
+		if shadow3 then
+			offset = 2
 		end
 
 		pass:plane( self.position.x + offset, self.position.y + offset, 0, self.animation.size.x, self.animation.size.y )

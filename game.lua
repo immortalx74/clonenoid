@@ -157,7 +157,7 @@ animations         = {}
 window             = { w = 224, h = 256, x = 0, y = 0, handle = nil }
 game_texture       = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
 
-game_state         = e_game_state.main_screen
+game_state         = e_game_state.generate_level
 level_idx          = 1
 sampler            = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle         = nil
@@ -194,6 +194,13 @@ function lovr.keypressed( key, scancode, repeating )
 			sounds.mothership_intro:play()
 			timers.typewriter:Reset()
 			game_state = e_game_state.story
+		end
+	end
+
+	if game_state == e_game_state.play then
+		if key == "return" then
+			level_idx = level_idx + 1
+			game_state = e_game_state.generate_level
 		end
 	end
 end
@@ -849,11 +856,11 @@ function Game.Update( dt )
 
 	if game_state == e_game_state.generate_level then
 		GenerateLevel( level_idx )
+		sounds.level_intro:stop()
+		sounds.level_intro:play()
 	elseif game_state == e_game_state.main_screen then
 
 	elseif game_state == e_game_state.level_intro then
-		sounds.level_intro:setLooping( false )
-		sounds.level_intro:play()
 		SetPaddlePos()
 		SetBallPos()
 
@@ -867,8 +874,30 @@ function Game.Update( dt )
 
 		local duration = sounds.level_intro:getDuration( "frames" )
 		if sounds.level_intro:tell( "frames" ) >= duration - 70000 then
-			timers.balls[ 1 ]:Reset()
-			game_state = e_game_state.play
+			local idx = 0
+			for i, v in ipairs( game_objects ) do
+				if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
+					v.animation:SetPaused( false )
+					idx = i
+				end
+			end
+
+			if idx > 0 then
+				if game_objects[ idx ].animation:GetFrame() == 6 then
+					for i, v in ipairs( game_objects ) do
+						if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
+							v.animation:SetFrame( 1 )
+							v.animation:SetPaused( true )
+						end
+					end
+
+					timers.balls[ 1 ]:Reset()
+					game_state = e_game_state.play
+				end
+			else
+				timers.balls[ 1 ]:Reset()
+				game_state = e_game_state.play
+			end
 		end
 	elseif game_state == e_game_state.play then
 		UpdatePowerUp()
