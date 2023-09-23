@@ -271,6 +271,10 @@ local function DrawScreenText( pass )
 					if not story_text.paragraph_finished then
 						story_text.paragraph_finished = true
 						timers.paragraph_end:Reset()
+
+						if story_text.paragraph < 3 then
+							story_text[ story_text.paragraph + 1 ][ 1 ]:Start()
+						end
 					end
 
 					if timers.paragraph_end:GetElapsed() > 0.5 then
@@ -819,17 +823,17 @@ function Game.Init()
 		paragraph = 1,
 		paragraph_finished = false,
 		{
-			TypeWriter:New( "THE ERA AND TIME OF", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( "THE ERA AND TIME OF", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ), -- auto-start the 1st one only
 			TypeWriter:New( "THIS STORY IS UNKNOWN.", vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 )
 		},
 		{
-			TypeWriter:New( "AFTER THE MOTHERSHIP", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( "AFTER THE MOTHERSHIP", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02 ),
 			TypeWriter:New( '"ARKANOID" WAS DESTROYED,', vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 ),
 			TypeWriter:New( 'A SPACECRAFT "VAUS"', vec2( 8, metrics.text_story_top + 32 ), timers.typewriter, 0.02 ),
 			TypeWriter:New( "SCRAMBLED AWAY FROM IT.", vec2( 8, metrics.text_story_top + 48 ), timers.typewriter, 0.02 )
 		},
 		{
-			TypeWriter:New( "BUT ONLY TO BE", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02, true ),
+			TypeWriter:New( "BUT ONLY TO BE", vec2( 8, metrics.text_story_top ), timers.typewriter, 0.02 ),
 			TypeWriter:New( "TRAPPED IN SPACE WARPED", vec2( 8, metrics.text_story_top + 16 ), timers.typewriter, 0.02 ),
 			TypeWriter:New( "BY SOMEONE........", vec2( 8, metrics.text_story_top + 32 ), timers.typewriter, 0.02 ),
 		}
