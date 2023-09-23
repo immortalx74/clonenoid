@@ -38,6 +38,8 @@ function GameObject:New( type, position, animation_type )
 		obj.animation = Animation:New( 30, vec2( 112, 8 ), textures.bar_h_r, 6, e_orientation.vertical )
 	elseif animation_type == e_animation.bg then
 		obj.animation = Animation:New( 60, vec2( 208, 232 ), textures.bg, 4, e_orientation.horizontal )
+	elseif animation_type == e_animation.starfield then
+		obj.animation = Animation:New( 1, vec2( 224, 256 ), textures.starfield, 1, e_orientation.horizontal )
 	elseif animation_type == e_animation.powerup_b then
 		obj.animation = Animation:New( 60, vec2( 16, 8 ), textures.powerup_break, 8, e_orientation.horizontal )
 	elseif animation_type == e_animation.powerup_c then

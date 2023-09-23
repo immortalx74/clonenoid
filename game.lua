@@ -89,7 +89,8 @@ e_animation        = {
 	paddle_laser = 23,
 	arkanoid_logo = 24,
 	taito_logo = 25,
-	mothership = 26
+	mothership = 26,
+	starfield = 27
 }
 
 local Game         = {}
@@ -157,7 +158,7 @@ animations         = {}
 window             = { w = 224, h = 256, x = 0, y = 0, handle = nil }
 game_texture       = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
 
-game_state         = e_game_state.generate_level
+game_state         = e_game_state.main_screen
 level_idx          = 1
 sampler            = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle         = nil
@@ -189,6 +190,7 @@ function lovr.keypressed( key, scancode, repeating )
 			obj_arkanoid_logo = nil
 			obj_taito_logo:Destroy()
 			obj_taito_logo = nil
+			GameObject:New( e_object_type.decorative, vec2( window.w / 2, window.h / 2 ), e_animation.starfield )
 			obj_mothership = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.mothership_top ), e_animation.mothership )
 			sounds.mothership_intro:stop()
 			sounds.mothership_intro:play()
@@ -327,6 +329,7 @@ end
 
 local function LoadTextures()
 	textures.bg = lovr.graphics.newTexture( "res/sprites/bg.png" )
+	textures.starfield = lovr.graphics.newTexture( "res/sprites/starfield.png" )
 	textures.arkanoid_logo = lovr.graphics.newTexture( "res/sprites/arkanoid_logo.png" )
 	textures.taito_logo = lovr.graphics.newTexture( "res/sprites/taito_logo.png" )
 	textures.life = lovr.graphics.newTexture( "res/sprites/life.png" )
