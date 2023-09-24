@@ -1,211 +1,11 @@
+require "util"
+require "globals"
+require "assets"
 local GameObject = require "gameobject"
 local Animation = require "animation"
 local Timer = require "timer"
 local TypeWriter = require "typewriter"
 local io = require "io"
-local ffi = require "ffi"
-local glfw = ffi.load( "glfw3" )
-
-ffi.cdef( [[
-	enum {
-		GLFW_RESIZABLE = 0x00020003,
-		GLFW_VISIBLE = 0x00020004,
-		GLFW_DECORATED = 0x00020005,
-		GLFW_FLOATING = 0x00020007
-	};
-
-	typedef int BOOL;
-	typedef long LONG;
-
-	typedef struct{
-		LONG x, y;
-	}POINT, *LPPOINT;
-
-	BOOL GetCursorPos(LPPOINT);
-
-	typedef struct GLFWvidmode {
-		int width;
-		int height;
-		int refreshRate;
-	} GLFWvidmode;
-
-	typedef struct GLFWwindow GLFWwindow;
-	GLFWwindow* os_get_glfw_window(void);
-	void glfwGetWindowPos(GLFWwindow* window, int *xpos, int *ypos);
-	void glfwSetInputMode(GLFWwindow * window, int GLFW_CURSOR, int GLFW_CURSOR_HIDDEN);
-	typedef void(*GLFWmousebuttonfun)(GLFWwindow*, int, int, int);
-	int glfwGetMouseButton(GLFWwindow* window, int button);
-	GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
-]] )
-GLFW_CURSOR        = 0x00033001
-GLFW_CURSOR_HIDDEN = 0x00034002
-
-e_game_state       = {
-	play = 1,
-	generate_level = 2,
-	level_intro = 3,
-	main_screen = 4,
-	story = 5
-}
-
-e_object_type      = {
-	paddle = 1,
-	enemy = 2,
-	decorative = 3,
-	brick = 4,
-	ball = 5,
-	powerup = 6,
-	laser = 7
-}
-
-e_orientation      = {
-	horizontal = 1,
-	vertical = 2
-}
-
-e_animation        = {
-	bg = 1,
-	bar_v = 2,
-	paddle_normal = 3,
-	paddle_big = 4,
-	brick_colored = 5,
-	brick_silver = 6,
-	brick_gold = 7,
-	ball = 8,
-	bar_h_l = 9,
-	bar_h_r = 10,
-	powerup_b = 11,
-	powerup_c = 12,
-	powerup_d = 13,
-	powerup_e = 14,
-	powerup_l = 15,
-	powerup_p = 16,
-	powerup_s = 17,
-	bar_v_closed = 18,
-	bar_v_opening = 19,
-	bar_v_open = 20,
-	life = 21,
-	laser = 22,
-	paddle_laser = 23,
-	arkanoid_logo = 24,
-	taito_logo = 25,
-	mothership = 26,
-	starfield = 27
-}
-
-local Game         = {}
-
-brick_type         = {
-	[ "w" ] = { anim = e_animation.brick_colored, frame = 1, points = 50 },
-	[ "o" ] = { anim = e_animation.brick_colored, frame = 2, points = 60 },
-	[ "c" ] = { anim = e_animation.brick_colored, frame = 3, points = 70 },
-	[ "g" ] = { anim = e_animation.brick_colored, frame = 4, points = 80 },
-	[ "r" ] = { anim = e_animation.brick_colored, frame = 5, points = 90 },
-	[ "b" ] = { anim = e_animation.brick_colored, frame = 6, points = 100 },
-	[ "p" ] = { anim = e_animation.brick_colored, frame = 7, points = 110 },
-	[ "y" ] = { anim = e_animation.brick_colored, frame = 8, points = 120 },
-	[ "s" ] = { anim = e_animation.brick_silver, frame = 1, points = 1 },
-	[ "$" ] = { anim = e_animation.brick_gold, frame = 1, points = 0 }
-}
-
-metrics            = {
-	bg_left = 112,
-	bg_top = 140,
-	bar_h_l_left = 56,
-	bar_h_l_top = 20,
-	bar_h_r_left = 168,
-	bar_h_r_top = 20,
-	bar_v_l_left = 4,
-	bar_v_l_top = 140,
-	bar_v_r_left = 220,
-	bar_v_r_top = 140,
-	wall_start_left = 16,
-	wall_start_top = 28,
-	wall_columns = 13,
-	brick_w = 16,
-	brick_h = 8,
-	paddle_y = 236,
-	paddle_constrain_left_normal = 24,
-	paddle_constrain_right_normal = 200,
-	paddle_constrain_left_big = 32,
-	paddle_constrain_right_big = 192,
-	ball_constrain_left = 10,
-	ball_constrain_right = 214,
-	ball_constrain_top = 24,
-	life_bar_left = 16,
-	life_bar_top = 252,
-	text_high_score_string_left = 112,
-	text_high_score_string_top = 4,
-	text_high_score_left = 112,
-	text_high_score_top = 12,
-	text_1up_left = 36,
-	text_1up_top = 4,
-	text_score_left = 48,
-	text_score_top = 12,
-	text_level_intro_top = 180,
-	arkanoid_logo_top = 70,
-	taito_logo_top = 185,
-	text_copyright_top = 208,
-	text_main_screen_msg = 112,
-	mothership_top = 196,
-	text_story_top = 26
-}
-
-levels             = {}
-backgrounds        = {}
-textures           = {}
-animations         = {}
-window             = { w = 224, h = 256, x = 0, y = 0, handle = nil }
-game_texture       = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
-
-game_state         = e_game_state.main_screen
-level_idx          = 1
-sampler            = lovr.graphics.newSampler( { filter = 'nearest' } )
-obj_paddle         = nil
-obj_ball           = nil
-obj_gate           = nil
-balls              = {}
-powerup            = { current = nil, dropping = nil, interval = math.random( 4, 7 ), type = nil }
-mouse              = { position = lovr.math.newVec2( 0, 0 ), prev_frame = 0, this_frame = 0 }
-life_bar           = { total = 3, objects = {}, max = 6 }
-rasterizer         = lovr.data.newRasterizer( "res/font/PressStart2P-Regular.ttf", 8 )
-font               = lovr.graphics.newFont( rasterizer )
-scores             = { high = 50000, player = 0 }
-bullets            = {}
-timers             = {}
-sounds             = {}
-story_text         = {}
-
-local function IsMouseDown()
-	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
-		return true
-	end
-	return false
-end
-
-function lovr.keypressed( key, scancode, repeating )
-	if game_state == e_game_state.main_screen then
-		if key == "space" then
-			obj_arkanoid_logo:Destroy()
-			obj_arkanoid_logo = nil
-			obj_taito_logo:Destroy()
-			obj_taito_logo = nil
-			GameObject:New( e_object_type.decorative, vec2( window.w / 2, window.h / 2 ), e_animation.starfield )
-			obj_mothership = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.mothership_top ), e_animation.mothership )
-			sounds.mothership_intro:stop()
-			sounds.mothership_intro:play()
-			timers.typewriter:Reset()
-			game_state = e_game_state.story
-		end
-	end
-
-	if game_state == e_game_state.play then
-		if key == "return" then
-			level_idx = level_idx + 1
-			game_state = e_game_state.generate_level
-		end
-	end
-end
 
 local function DrawScreenText( pass )
 	font:setPixelDensity( 1 )
@@ -305,79 +105,6 @@ local function DrawScreenText( pass )
 			end
 		end
 	end
-end
-
-local function Split( input )
-	local stripped = input:gsub( "[\r\n,]", "" ) -- Remove newlines and commas
-	local characters = {}
-
-	for char in stripped:gmatch( "." ) do
-		table.insert( characters, char )
-	end
-
-	return characters
-end
-
-local function LoadLevels()
-	local files = lovr.filesystem.getDirectoryItems( "res/levels" )
-
-	for i, v in ipairs( files ) do
-		local str = lovr.filesystem.read( "res/levels/" .. i .. ".csv" )
-		table.insert( levels, Split( str ) )
-	end
-end
-
-local function LoadTextures()
-	textures.bg = lovr.graphics.newTexture( "res/sprites/bg.png" )
-	textures.starfield = lovr.graphics.newTexture( "res/sprites/starfield.png" )
-	textures.arkanoid_logo = lovr.graphics.newTexture( "res/sprites/arkanoid_logo.png" )
-	textures.taito_logo = lovr.graphics.newTexture( "res/sprites/taito_logo.png" )
-	textures.life = lovr.graphics.newTexture( "res/sprites/life.png" )
-	textures.mothership = lovr.graphics.newTexture( "res/sprites/mothership.png" )
-
-	textures.bar_v_closed = lovr.graphics.newTexture( "res/sprites/bar_v_closed.png" )
-	textures.bar_v_opening = lovr.graphics.newTexture( "res/sprites/bar_v_opening.png" )
-	textures.bar_v_open = lovr.graphics.newTexture( "res/sprites/bar_v_open.png" )
-
-	textures.bar_h_l = lovr.graphics.newTexture( "res/sprites/bar_h_l.png" )
-	textures.bar_h_r = lovr.graphics.newTexture( "res/sprites/bar_h_r.png" )
-
-	textures.paddle_normal = lovr.graphics.newTexture( "res/sprites/paddle_normal.png" )
-	textures.paddle_big = lovr.graphics.newTexture( "res/sprites/paddle_big.png" )
-	textures.paddle_laser = lovr.graphics.newTexture( "res/sprites/paddle_laser.png" )
-	textures.paddle_appear = lovr.graphics.newTexture( "res/sprites/paddle_appear.png" )
-
-	textures.powerup_break = lovr.graphics.newTexture( "res/sprites/powerup_b.png" )
-	textures.powerup_laser = lovr.graphics.newTexture( "res/sprites/powerup_l.png" )
-	textures.powerup_enlarge = lovr.graphics.newTexture( "res/sprites/powerup_e.png" )
-	textures.powerup_catch = lovr.graphics.newTexture( "res/sprites/powerup_c.png" )
-	textures.powerup_slow = lovr.graphics.newTexture( "res/sprites/powerup_s.png" )
-	textures.powerup_disruption = lovr.graphics.newTexture( "res/sprites/powerup_d.png" )
-	textures.powerup_player = lovr.graphics.newTexture( "res/sprites/powerup_p.png" )
-	textures.powerup_shadow = lovr.graphics.newTexture( "res/sprites/powerup_shadow.png" )
-
-	textures.bricks = lovr.graphics.newTexture( "res/sprites/bricks.png" )
-	textures.brick_silver = lovr.graphics.newTexture( "res/sprites/brick_silver.png" )
-	textures.brick_gold = lovr.graphics.newTexture( "res/sprites/brick_gold.png" )
-
-	textures.ball = lovr.graphics.newTexture( "res/sprites/ball.png" )
-
-	textures.laser = lovr.graphics.newTexture( "res/sprites/laser.png" )
-end
-
-local function LoadSounds()
-	sounds.ball_brick_destroy = lovr.audio.newSource( "res/sounds/ball_brick_destroy.wav" )
-	sounds.ball_brick_ding = lovr.audio.newSource( "res/sounds/ball_brick_ding.wav" )
-	sounds.ball_to_paddle = lovr.audio.newSource( "res/sounds/ball_to_paddle.wav" )
-	sounds.ball_to_paddle_stick = lovr.audio.newSource( "res/sounds/ball_to_paddle_stick.wav" )
-	sounds.enemy_destroy = lovr.audio.newSource( "res/sounds/enemy_destroy.wav" )
-	sounds.got_life = lovr.audio.newSource( "res/sounds/got_life.wav" )
-	sounds.laser_shoot = lovr.audio.newSource( "res/sounds/laser_shoot.wav" )
-	sounds.level_intro = lovr.audio.newSource( "res/sounds/level_intro.wav" )
-	sounds.paddle_turn_big = lovr.audio.newSource( "res/sounds/paddle_turn_big.wav" )
-	sounds.escape_level = lovr.audio.newSource( "res/sounds/escape_level.wav" )
-	sounds.mothership_intro = lovr.audio.newSource( "res/sounds/mothership_intro.wav" )
-	sounds.paddle_away = lovr.audio.newSource( "res/sounds/paddle_away.wav" )
 end
 
 local function DropPowerUp( x, y )
@@ -484,36 +211,6 @@ local function GenerateLevel( idx )
 	timers.powerup:Reset()
 	timers.level_intro:Reset()
 	game_state = e_game_state.level_intro
-end
-
-local function GetWindowPos()
-	local wx, wy = ffi.new( 'int[1]' ), ffi.new( 'int[1]' )
-	glfw.glfwGetWindowPos( window.handle, wx, wy )
-	window.x = wx[ 0 ]
-	window.y = wy[ 0 ]
-end
-
-local function GetMousePos()
-	local mouse_pos = ffi.new( "POINT[1]" )
-	ffi.C.GetCursorPos( mouse_pos )
-	mouse.position.x = mouse_pos[ 0 ].x
-	mouse.position.y = mouse_pos[ 0 ].y
-
-	if glfw.glfwGetMouseButton( window.handle, 0 ) > 0 then
-		if mouse.prev_frame == 0 then
-			mouse.prev_frame = 1
-			mouse.this_frame = 1
-		else
-			mouse.prev_frame = 1
-			mouse.this_frame = 0
-		end
-	else
-		mouse.prev_frame = 0
-	end
-end
-
-local function GetWindowScale()
-	return lovr.system.getWindowWidth() / 224
 end
 
 local function UpdateBullets()
@@ -649,7 +346,7 @@ local function UpdatePowerUp()
 	end
 end
 
-local function SetPaddlePos()
+local function UpdatePaddle()
 	local scale = GetWindowScale()
 	obj_paddle.position.x = (mouse.position.x / scale) - (window.x / scale)
 
@@ -682,7 +379,6 @@ local function SetPaddlePos()
 
 	-- Exit from gate
 	if obj_paddle.position.x > window.w - 16 and not obj_paddle.begin_exit then
-		print( "exit" )
 		obj_paddle.begin_exit = true
 		sounds.escape_level:stop()
 		sounds.escape_level:play()
@@ -692,7 +388,7 @@ local function SetPaddlePos()
 end
 
 -- TODO fix sticky
-local function SetBallPos()
+local function UpdateBall()
 	-- Ball[s] position
 	for i = 1, #balls do
 		if balls[ i ].sticky then
@@ -777,12 +473,15 @@ local function SetBallPos()
 		-- Bricks collision
 		for j, v in ipairs( game_objects ) do
 			if v.type == e_object_type.brick then
-				local l = v.position.x - 8
-				local r = v.position.x + 8
-				local t = v.position.y - 4
-				local b = v.position.y + 4
+				local rect1 = { l = v.position.x - 8, r = v.position.x + 8, t = v.position.y - 4, b = v.position.y + 4 }
+				local rect2 = { l = xx - 2, r = xx + 2, t = yy - 2, b = yy + 2 }
+				-- local l = v.position.x - 8
+				-- local r = v.position.x + 8
+				-- local t = v.position.y - 4
+				-- local b = v.position.y + 4
 
-				if xx > l and xx < r and yy > t and yy < b then
+				-- if xx > l and xx < r and yy > t and yy < b then
+				if RectToRect( rect1, rect2 ) then
 					balls[ i ].velocity_y = -balls[ i ].velocity_y
 					v.strength = v.strength - 1
 					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
@@ -808,6 +507,7 @@ local function SetBallPos()
 	end
 end
 
+local Game = {}
 function Game.Init()
 	lovr.graphics.setBackgroundColor( 0, 0, 0 )
 	LoadLevels()
@@ -864,8 +564,8 @@ function Game.Update( dt )
 	elseif game_state == e_game_state.main_screen then
 
 	elseif game_state == e_game_state.level_intro then
-		SetPaddlePos()
-		SetBallPos()
+		UpdatePaddle()
+		UpdateBall()
 
 		if obj_paddle.animation_type == e_animation.paddle_appear and obj_paddle.animation:GetFrame() == 5 then
 			obj_paddle:Destroy()
@@ -913,8 +613,8 @@ function Game.Update( dt )
 				game_state = e_game_state.generate_level
 			end
 		else
-			SetPaddlePos()
-			SetBallPos()
+			UpdatePaddle()
+			UpdateBall()
 		end
 
 		if levels[ level_idx ].num_destroyable_bricks == 0 then
