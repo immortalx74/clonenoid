@@ -10,15 +10,6 @@ ffi.cdef( [[
 		GLFW_FLOATING = 0x00020007
 	};
 
-	typedef int BOOL;
-	typedef long LONG;
-
-	typedef struct{
-		LONG x, y;
-	}POINT, *LPPOINT;
-
-	BOOL GetCursorPos(LPPOINT);
-
 	typedef struct GLFWvidmode {
 		int width;
 		int height;
@@ -32,6 +23,7 @@ ffi.cdef( [[
 	typedef void(*GLFWmousebuttonfun)(GLFWwindow*, int, int, int);
 	int glfwGetMouseButton(GLFWwindow* window, int button);
 	GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
+	void glfwGetCursorPos(GLFWwindow *window, double *xpos, double *ypos); 	
 ]] )
 GLFW_CURSOR        = 0x00033001
 GLFW_CURSOR_HIDDEN = 0x00034002
@@ -47,11 +39,13 @@ function Split( input )
 	return characters
 end
 
-function GetMousePos()
-	local mouse_pos = ffi.new( "POINT[1]" )
-	ffi.C.GetCursorPos( mouse_pos )
-	mouse.position.x = mouse_pos[ 0 ].x
-	mouse.position.y = mouse_pos[ 0 ].y
+function GetMouse()
+	local mx = ffi.new( "double[1]" )
+	local my = ffi.new( "double[1]" )
+
+	glfw.glfwGetCursorPos( game_handle, mx, my )
+	mouse.position.x = mx[ 0 ]
+	mouse.position.y = my[ 0 ]
 
 	if glfw.glfwGetMouseButton( game_handle, 0 ) > 0 then
 		if mouse.prev_frame == 0 then

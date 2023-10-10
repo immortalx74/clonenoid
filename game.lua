@@ -348,7 +348,7 @@ end
 
 local function UpdatePaddle()
 	local scale = GetWindowScale()
-	obj_paddle.position.x = (mouse.position.x / scale) - (window.x / scale)
+	obj_paddle.position.x = mouse.position.x / scale
 
 	local constrain_left = metrics.paddle_constrain_left_normal
 	local constrain_right = metrics.paddle_constrain_right_normal
@@ -553,7 +553,7 @@ end
 
 function Game.Update( dt )
 	GetWindowPos()
-	GetMousePos()
+	GetMouse()
 	GameObject.UpdateAll( dt )
 	UpdateBullets()
 
