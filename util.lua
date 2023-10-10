@@ -53,7 +53,7 @@ function GetMousePos()
 	mouse.position.x = mouse_pos[ 0 ].x
 	mouse.position.y = mouse_pos[ 0 ].y
 
-	if glfw.glfwGetMouseButton( window.handle, 0 ) > 0 then
+	if glfw.glfwGetMouseButton( game_handle, 0 ) > 0 then
 		if mouse.prev_frame == 0 then
 			mouse.prev_frame = 1
 			mouse.this_frame = 1
@@ -68,13 +68,13 @@ end
 
 function GetWindowPos()
 	local wx, wy = ffi.new( 'int[1]' ), ffi.new( 'int[1]' )
-	glfw.glfwGetWindowPos( window.handle, wx, wy )
+	glfw.glfwGetWindowPos( game_handle, wx, wy )
 	window.x = wx[ 0 ]
 	window.y = wy[ 0 ]
 end
 
 function GetWindowScale()
-	return lovr.system.getWindowWidth() / 224
+	return (lovr.system.getWindowWidth() / 224)
 end
 
 function IsMouseDown()
@@ -109,8 +109,8 @@ function lovr.keypressed( key, scancode, repeating )
 			obj_arkanoid_logo = nil
 			obj_taito_logo:Destroy()
 			obj_taito_logo = nil
-			GameObject:New( e_object_type.decorative, vec2( window.w / 2, window.h / 2 ), e_animation.starfield )
-			obj_mothership = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.mothership_top ), e_animation.mothership )
+			GameObject:New( e_object_type.decorative, vec2( game_w / 2, game_h / 2 ), e_animation.starfield )
+			obj_mothership = GameObject:New( e_object_type.decorative, vec2( game_w / 2, metrics.mothership_top ), e_animation.mothership )
 			sounds.mothership_intro:stop()
 			sounds.mothership_intro:play()
 			timers.typewriter:Reset()
@@ -124,4 +124,15 @@ function lovr.keypressed( key, scancode, repeating )
 			game_state = e_game_state.generate_level
 		end
 	end
+end
+
+function WindowWasResized()
+	local w, h = lovr.system.getWindowDimensions()
+	if w ~= window.w or h ~= window.h then
+		window.w = w
+		window.h = h
+		return true
+	end
+
+	return false
 end

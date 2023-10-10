@@ -45,22 +45,22 @@ local function DrawScreenText( pass )
 		if level_idx > 9 then
 			str = "ROUND "
 		end
-		pass:text( str .. tostring( level_idx ), window.w / 2, metrics.text_level_intro_top, 1 )
+		pass:text( str .. tostring( level_idx ), game_w / 2, metrics.text_level_intro_top, 1 )
 
 		if timers.level_intro:GetElapsed() > 1 then
-			pass:text( "READY", window.w / 2, metrics.text_level_intro_top + 16, 1 )
+			pass:text( "READY", game_w / 2, metrics.text_level_intro_top + 16, 1 )
 		end
 	elseif game_state == e_game_state.main_screen then
 		pass:setColor( 1, 1, 1 )
 
-		pass:text( "A FREE OPEN-SOURCE PORT", window.w / 2, metrics.text_main_screen_msg, 1 )
-		pass:text( "OF THE ARCADE VERSION", window.w / 2, metrics.text_main_screen_msg + 16, 1 )
-		pass:text( "MADE WITH LÖVR (lovr.org)", window.w / 2, metrics.text_main_screen_msg + 32, 1 )
+		pass:text( "A FREE OPEN-SOURCE PORT", game_w / 2, metrics.text_main_screen_msg, 1 )
+		pass:text( "OF THE ARCADE VERSION", game_w / 2, metrics.text_main_screen_msg + 16, 1 )
+		pass:text( "MADE WITH LÖVR (lovr.org)", game_w / 2, metrics.text_main_screen_msg + 32, 1 )
 
 
 		if timers.press_space:GetElapsed() >= 0.5 then
 			pass:setColor( 1, 0, 0 )
-			pass:text( "[PRESS SPACE TO START]", window.w / 2, metrics.text_main_screen_msg + 48, 1 )
+			pass:text( "[PRESS SPACE TO START]", game_w / 2, metrics.text_main_screen_msg + 48, 1 )
 		end
 
 		if timers.press_space:GetElapsed() >= 1 then
@@ -68,8 +68,8 @@ local function DrawScreenText( pass )
 		end
 
 		pass:setColor( 1, 1, 1 )
-		pass:text( "© 1986 TAITO CORP JAPAN", window.w / 2, metrics.text_copyright_top, 1 )
-		pass:text( "ALL RIGHTS RESERVED", window.w / 2, metrics.text_copyright_top + 16, 1 )
+		pass:text( "© 1986 TAITO CORP JAPAN", game_w / 2, metrics.text_copyright_top, 1 )
+		pass:text( "ALL RIGHTS RESERVED", game_w / 2, metrics.text_copyright_top + 16, 1 )
 	elseif game_state == e_game_state.story then
 		for i, v in ipairs( story_text[ story_text.paragraph ] ) do
 			v:Draw( pass )
@@ -190,11 +190,11 @@ local function GenerateLevel( idx )
 	obj_gate.animation:SetPaused( true )
 
 	-- Paddle (start with appear animation)
-	obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_appear )
+	obj_paddle = GameObject:New( e_object_type.paddle, vec2( game_w / 2, metrics.paddle_y ), e_animation.paddle_appear )
 
 	-- Ball
 	balls = {}
-	local b = GameObject:New( e_object_type.ball, vec2( window.w / 2, metrics.paddle_y - 8 ), e_animation.ball )
+	local b = GameObject:New( e_object_type.ball, vec2( game_w / 2, metrics.paddle_y - 8 ), e_animation.ball )
 	b.velocity_x = 2
 	b.velocity_y = 2
 	b.sticky = true
@@ -283,7 +283,7 @@ local function UpdatePowerUp()
 
 		powerup.dropping.position.y = powerup.dropping.position.y + 1
 		-- Powerup went off screen
-		if powerup.dropping.position.y > window.h then
+		if powerup.dropping.position.y > game_h then
 			powerup.dropping:Destroy()
 			powerup.dropping = nil
 			timers.powerup:Reset()
@@ -306,14 +306,14 @@ local function UpdatePowerUp()
 				elseif powerup.type == e_animation.powerup_e then
 					obj_paddle:Destroy()
 					obj_paddle = nil
-					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_big )
+					obj_paddle = GameObject:New( e_object_type.paddle, vec2( game_w / 2, metrics.paddle_y ), e_animation.paddle_big )
 					obj_paddle.prev_x = 0
 					sounds.paddle_turn_big:stop()
 					sounds.paddle_turn_big:play()
 				elseif powerup.type == e_animation.powerup_l then
 					obj_paddle:Destroy()
 					obj_paddle = nil
-					obj_paddle = GameObject:New( e_object_type.paddle, vec2( window.w / 2, metrics.paddle_y ), e_animation.paddle_laser )
+					obj_paddle = GameObject:New( e_object_type.paddle, vec2( game_w / 2, metrics.paddle_y ), e_animation.paddle_laser )
 					obj_paddle.prev_x = 0
 					obj_paddle.can_shoot = true
 				elseif powerup.type == e_animation.powerup_p then
@@ -378,7 +378,7 @@ local function UpdatePaddle()
 	end
 
 	-- Exit from gate
-	if obj_paddle.position.x > window.w - 16 and not obj_paddle.begin_exit then
+	if obj_paddle.position.x > game_w - 16 and not obj_paddle.begin_exit then
 		obj_paddle.begin_exit = true
 		sounds.escape_level:stop()
 		sounds.escape_level:play()
@@ -426,8 +426,8 @@ local function UpdateBall()
 		end
 
 		-- NOTE: bounces on floor
-		if balls[ i ].position.y > window.h then
-			balls[ i ].position.y = window.h
+		if balls[ i ].position.y > game_h then
+			balls[ i ].position.y = game_h
 			balls[ i ].velocity_y = -balls[ i ].velocity_y
 		end
 
@@ -514,8 +514,8 @@ function Game.Init()
 	LoadTextures()
 	LoadSounds()
 
-	window.handle = ffi.C.os_get_glfw_window()
-	glfw.glfwSetInputMode( window.handle, GLFW_CURSOR, GLFW_CURSOR_HIDDEN )
+	game_handle = ffi.C.os_get_glfw_window()
+	glfw.glfwSetInputMode( game_handle, GLFW_CURSOR, GLFW_CURSOR_HIDDEN )
 	math.randomseed( os.time() )
 
 	timers.typewriter    = Timer:New()
@@ -526,8 +526,8 @@ function Game.Init()
 	timers.level_intro   = Timer:New()
 	timers.balls         = { Timer:New(), Timer:New(), Timer:New() }
 
-	obj_arkanoid_logo    = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.arkanoid_logo_top ), e_animation.arkanoid_logo )
-	obj_taito_logo       = GameObject:New( e_object_type.decorative, vec2( window.w / 2, metrics.taito_logo_top ), e_animation.taito_logo )
+	obj_arkanoid_logo    = GameObject:New( e_object_type.decorative, vec2( game_w / 2, metrics.arkanoid_logo_top ), e_animation.arkanoid_logo )
+	obj_taito_logo       = GameObject:New( e_object_type.decorative, vec2( game_w / 2, metrics.taito_logo_top ), e_animation.taito_logo )
 
 	story_text           = {
 		paragraph = 1,
@@ -624,7 +624,7 @@ function Game.Update( dt )
 	end
 end
 
-function Game.Draw()
+function Game.Draw( pass )
 	local game_pass = lovr.graphics.getPass( "render", game_texture )
 	game_pass:setProjection( 1, mat4():orthographic( game_pass:getDimensions() ) )
 	game_pass:setSampler( sampler )
@@ -632,12 +632,31 @@ function Game.Draw()
 	GameObject.DrawAll( game_pass )
 	DrawScreenText( game_pass )
 
-	if game_state == e_game_state.play then
-	elseif game_state == e_game_state.level_intro then
+	if WindowWasResized() then
+		local ratio = 256 / 224 -- 1,142857142857143
+		plane_w = window.w
+		plane_h = window.h
 
+		if (window.h / window.w) < ratio then
+			plane_h = window.h
+			plane_w = window.h / ratio
+		elseif (window.h / window.w) > ratio then
+			plane_w = window.w
+			plane_h = window.w * ratio
+		end
 	end
 
-	return game_pass
+	pass:setSampler( sampler )
+
+	pass:setColor( 1, 1, 1 )
+	pass:setMaterial( game_texture )
+	pass:setProjection( 1, mat4():orthographic( pass:getDimensions() ) )
+	pass:plane( window.w / 2, window.h / 2, 0, plane_w, -plane_h )
+
+	local passes = {}
+	table.insert( passes, game_pass )
+	table.insert( passes, pass )
+	return lovr.graphics.submit( passes )
 end
 
 return Game

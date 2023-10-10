@@ -112,9 +112,13 @@ backgrounds   = {}
 textures      = {}
 animations    = {}
 window        = { w = 224, h = 256, x = 0, y = 0, handle = nil }
-game_texture  = lovr.graphics.newTexture( window.w, window.h, { usage = { "sample", "render" }, mipmaps = false } )
+game_w = 224
+game_h = 256
+plane_w = 224
+plane_h = 256
+game_texture  = lovr.graphics.newTexture( game_w, game_h, { usage = { "sample", "render" }, mipmaps = false } )
 
-game_state    = e_game_state.generate_level
+game_state    = e_game_state.main_screen
 level_idx     = 1
 sampler       = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle    = nil
