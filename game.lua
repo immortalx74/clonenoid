@@ -347,8 +347,9 @@ local function UpdatePowerUp()
 end
 
 local function UpdatePaddle()
-	local scale = GetWindowScale()
-	obj_paddle.position.x = mouse.position.x / scale
+	local scale = plane_w / game_w
+	local diff = (window.w - plane_w) / 2
+	obj_paddle.position.x = (mouse.position.x / scale) - (diff / scale)
 
 	local constrain_left = metrics.paddle_constrain_left_normal
 	local constrain_right = metrics.paddle_constrain_right_normal

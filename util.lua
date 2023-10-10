@@ -67,10 +67,6 @@ function GetWindowPos()
 	window.y = wy[ 0 ]
 end
 
-function GetWindowScale()
-	return (lovr.system.getWindowWidth() / 224)
-end
-
 function IsMouseDown()
 	if mouse.this_frame == 1 and mouse.prev_frame == 1 then
 		return true

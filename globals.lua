@@ -118,7 +118,7 @@ plane_w = 224
 plane_h = 256
 game_texture  = lovr.graphics.newTexture( game_w, game_h, { usage = { "sample", "render" }, mipmaps = false } )
 
-game_state    = e_game_state.main_screen
+game_state    = e_game_state.generate_level
 level_idx     = 1
 sampler       = lovr.graphics.newSampler( { filter = 'nearest' } )
 obj_paddle    = nil
