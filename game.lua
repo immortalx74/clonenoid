@@ -110,8 +110,8 @@ end
 local function DropPowerUp( x, y )
 	-- Drop random powerup
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
-		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
-		powerup.type = e_animation.powerup_l
+		powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
+		-- powerup.type = e_animation.powerup_l
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -127,6 +127,8 @@ local function GenerateLevel( idx )
 	obj_paddle   = nil
 	obj_ball     = nil
 	obj_gate     = nil
+	level_bricks = nil
+	level_bricks = {}
 
 	-- background
 	local bg     = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
@@ -170,6 +172,8 @@ local function GenerateLevel( idx )
 				go.strength = 1
 				level.num_destroyable_bricks = level.num_destroyable_bricks + 1
 			end
+
+			table.insert( level_bricks, go )
 		end
 		x = x + metrics.brick_w
 	end
@@ -195,8 +199,7 @@ local function GenerateLevel( idx )
 	-- Ball
 	balls = {}
 	local b = GameObject:New( e_object_type.ball, vec2( game_w / 2, metrics.paddle_y - 8 ), e_animation.ball )
-	b.velocity_x = 2
-	b.velocity_y = 2
+	b.velocity = lovr.math.newVec2( 150, -150 )
 	b.sticky = true
 	table.insert( balls, b )
 
@@ -388,9 +391,8 @@ local function UpdatePaddle()
 	obj_paddle.prev_x = obj_paddle.position.x
 end
 
--- TODO fix sticky
-local function UpdateBall()
-	-- Ball[s] position
+local function UpdateBall( dt )
+	local steps = 8
 	for i = 1, #balls do
 		if balls[ i ].sticky then
 			balls[ i ].position.x = obj_paddle.position.x
@@ -398,109 +400,98 @@ local function UpdateBall()
 			if game_state == e_game_state.play then
 				if IsMouseDown() or timers.balls[ i ]:GetElapsed() > 2 then
 					balls[ i ].sticky = false
-					balls[ i ].velocity_x = 2
-					balls[ i ].velocity_y = -2
 					if IsMouseDown() then
 						sounds.ball_to_paddle:stop()
 						sounds.ball_to_paddle:play()
 					end
 				end
 			end
-		else
-			balls[ i ].position.x = balls[ i ].position.x + balls[ i ].velocity_x
-			balls[ i ].position.y = balls[ i ].position.y + balls[ i ].velocity_y
+			return
 		end
 
-		if balls[ i ].position.x < metrics.ball_constrain_left then
-			balls[ i ].position.x = metrics.ball_constrain_left
-			balls[ i ].velocity_x = -balls[ i ].velocity_x
-		end
+		local prev_x = balls[ i ].position.x
+		local prev_y = balls[ i ].position.y
 
-		if balls[ i ].position.x > metrics.ball_constrain_right then
-			balls[ i ].position.x = metrics.ball_constrain_right
-			balls[ i ].velocity_x = -balls[ i ].velocity_x
-		end
+		for j = 1, steps do
+			balls[ i ].position.x = balls[ i ].position.x + (balls[ i ].velocity.x / steps) * dt
+			balls[ i ].position.y = balls[ i ].position.y + (balls[ i ].velocity.y / steps) * dt
 
-		if balls[ i ].position.y < metrics.ball_constrain_top then
-			balls[ i ].position.y = metrics.ball_constrain_top
-			balls[ i ].velocity_y = -balls[ i ].velocity_y
-		end
+			-- Keep inside play area
+			if balls[ i ].position.x < metrics.ball_constrain_left then
+				balls[ i ].position.x = metrics.ball_constrain_left
+				balls[ i ].velocity.x = -balls[ i ].velocity.x
+			end
 
-		-- NOTE: bounces on floor
-		if balls[ i ].position.y > game_h then
-			balls[ i ].position.y = game_h
-			balls[ i ].velocity_y = -balls[ i ].velocity_y
-		end
+			if balls[ i ].position.x > metrics.ball_constrain_right then
+				balls[ i ].position.x = metrics.ball_constrain_right
+				balls[ i ].velocity.x = -balls[ i ].velocity.x
+			end
 
-		-- Ball -> paddle collision
-		local half_size = 16
-		if obj_paddle.animation_type == e_animation.paddle_big then
-			half_size = 24
-		end
-		if balls[ i ].position.x > obj_paddle.position.x - half_size and balls[ i ].position.x < obj_paddle.position.x + half_size then
-			if balls[ i ].position.y > obj_paddle.position.y - 4 then
-				balls[ i ].velocity_y = -balls[ i ].velocity_y
-				sounds.ball_to_paddle:stop()
-				sounds.ball_to_paddle:play()
+			if balls[ i ].position.y < metrics.ball_constrain_top then
+				balls[ i ].position.y = metrics.ball_constrain_top
+				balls[ i ].velocity.y = -balls[ i ].velocity.y
+			end
 
-				local dir = 0
+			if balls[ i ].position.y > game_h then
+				balls[ i ].position.y = game_h
+				balls[ i ].velocity.y = -balls[ i ].velocity.y
+			end
 
-				if obj_paddle.position.x > obj_paddle.prev_x then
-					dir = 1
-				end
+			-- Ball -> paddle collision
+			local half_size = 16
+			if obj_paddle.animation_type == e_animation.paddle_big then
+				half_size = 24
+			end
 
-				if obj_paddle.position.x < obj_paddle.prev_x then
-					dir = -1
-				end
-
-				if balls[ i ].position.x > obj_paddle.position.x + 6 then
-					-- right
-					balls[ i ].velocity_x = balls[ i ].velocity_x + 0.5
-				elseif balls[ i ].position.x < obj_paddle.position.x - 6 then
-					-- left
-					balls[ i ].velocity_x = balls[ i ].velocity_x - 0.5
-				else
-					-- middle
-					local sign = 1
-					if balls[ i ].velocity_x < 0 then sign = -1 end
-					balls[ i ].velocity_x = 2 * sign
+			if balls[ i ].position.x > obj_paddle.position.x - half_size and balls[ i ].position.x < obj_paddle.position.x + half_size then
+				if balls[ i ].position.y > obj_paddle.position.y - 4 then
+					balls[ i ].velocity.y = -balls[ i ].velocity.y
+					sounds.ball_to_paddle:stop()
+					sounds.ball_to_paddle:play()
 				end
 			end
-		end
 
-		local xx = balls[ i ].position.x
-		local yy = balls[ i ].position.y
+			-- Bricks collision
+			local cur_x = balls[ i ].position.x
+			local cur_y = balls[ i ].position.y
 
-		-- Bricks collision
-		for j, v in ipairs( game_objects ) do
-			if v.type == e_object_type.brick then
-				local rect1 = { l = v.position.x - 8, r = v.position.x + 8, t = v.position.y - 4, b = v.position.y + 4 }
-				local rect2 = { l = xx - 2, r = xx + 2, t = yy - 2, b = yy + 2 }
-				-- local l = v.position.x - 8
-				-- local r = v.position.x + 8
-				-- local t = v.position.y - 4
-				-- local b = v.position.y + 4
+			for k, v in ipairs( game_objects ) do
+				if v.type == e_object_type.brick then
+					local rect_brick = { l = v.position.x - 8, r = v.position.x + 8, t = v.position.y - 4, b = v.position.y + 4 }
+					local rect_ball_cur = { l = cur_x - 2, r = cur_x + 2, t = cur_y - 2, b = cur_y + 2 }
 
-				-- if xx > l and xx < r and yy > t and yy < b then
-				if RectToRect( rect1, rect2 ) then
-					balls[ i ].velocity_y = -balls[ i ].velocity_y
-					v.strength = v.strength - 1
-					if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
-						v.animation:SetPaused( false )
-
-						if v.strength > 0 then
-							sounds.ball_brick_ding:stop()
-							sounds.ball_brick_ding:play()
+					if RectToRect( rect_brick, rect_ball_cur ) then
+						-- Determine collision side
+						local rect_ball_prev = { l = prev_x - 2, r = prev_x + 2, t = prev_y - 2, b = prev_y + 2 }
+						if rect_ball_cur.t < rect_brick.b and rect_ball_prev.t > rect_brick.b then -- from bottom
+							balls[ i ].velocity.y = -balls[ i ].velocity.y
+						elseif rect_ball_cur.b > rect_brick.t and rect_ball_prev.b < rect_brick.t then -- from top
+							balls[ i ].velocity.y = -balls[ i ].velocity.y
+						elseif rect_ball_cur.l < rect_brick.r and rect_ball_prev.l > rect_brick.r then -- from right
+							balls[ i ].velocity.x = -balls[ i ].velocity.x
+						elseif rect_ball_cur.r > rect_brick.l and rect_ball_prev.r < rect_brick.l then -- from left
+							balls[ i ].velocity.x = -balls[ i ].velocity.x
 						end
-					end
 
-					if v.strength == 0 then
-						sounds.ball_brick_destroy:stop()
-						sounds.ball_brick_destroy:play()
-						DropPowerUp( v.position.x, v.position.y )
-						table.remove( game_objects, j )
-						scores.player = scores.player + v.points
-						levels[ level_idx ].num_destroyable_bricks = levels[ level_idx ].num_destroyable_bricks - 1
+						v.strength = v.strength - 1
+						if v.animation_type == e_animation.brick_silver or v.animation_type == e_animation.brick_gold then
+							v.animation:SetPaused( false )
+
+							if v.strength > 0 then
+								sounds.ball_brick_ding:stop()
+								sounds.ball_brick_ding:play()
+							end
+						end
+
+						if v.strength == 0 then
+							sounds.ball_brick_destroy:stop()
+							sounds.ball_brick_destroy:play()
+							DropPowerUp( v.position.x, v.position.y )
+							table.remove( game_objects, k )
+							scores.player = scores.player + v.points
+							levels[ level_idx ].num_destroyable_bricks = levels[ level_idx ].num_destroyable_bricks - 1
+						end
+						break
 					end
 				end
 			end
@@ -566,7 +557,7 @@ function Game.Update( dt )
 
 	elseif game_state == e_game_state.level_intro then
 		UpdatePaddle()
-		UpdateBall()
+		UpdateBall( dt )
 
 		if obj_paddle.animation_type == e_animation.paddle_appear and obj_paddle.animation:GetFrame() == 5 then
 			obj_paddle:Destroy()
@@ -615,7 +606,7 @@ function Game.Update( dt )
 			end
 		else
 			UpdatePaddle()
-			UpdateBall()
+			UpdateBall( dt )
 		end
 
 		if levels[ level_idx ].num_destroyable_bricks == 0 then
