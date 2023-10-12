@@ -112,10 +112,10 @@ backgrounds   = {}
 textures      = {}
 animations    = {}
 window        = { w = 224, h = 256, x = 0, y = 0, handle = nil }
-game_w = 224
-game_h = 256
-plane_w = window.w
-plane_h = window.h
+game_w        = 224
+game_h        = 256
+plane_w       = window.w
+plane_h       = window.h
 game_texture  = lovr.graphics.newTexture( game_w, game_h, { usage = { "sample", "render" }, mipmaps = false } )
 
 game_state    = e_game_state.main_screen

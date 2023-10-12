@@ -20,9 +20,6 @@ ffi.cdef( [[
 	GLFWwindow* os_get_glfw_window(void);
 	void glfwGetWindowPos(GLFWwindow* window, int *xpos, int *ypos);
 	void glfwSetInputMode(GLFWwindow * window, int GLFW_CURSOR, int GLFW_CURSOR_HIDDEN);
-	typedef void(*GLFWmousebuttonfun)(GLFWwindow*, int, int, int);
-	int glfwGetMouseButton(GLFWwindow* window, int button);
-	GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
 	void glfwGetCursorPos(GLFWwindow *window, double *xpos, double *ypos); 	
 ]] )
 GLFW_CURSOR        = 0x00033001
@@ -47,7 +44,7 @@ function GetMouse()
 	mouse.position.x = mx[ 0 ]
 	mouse.position.y = my[ 0 ]
 
-	if glfw.glfwGetMouseButton( game_handle, 0 ) > 0 then
+	if lovr.system.isMouseDown( 1 ) then
 		if mouse.prev_frame == 0 then
 			mouse.prev_frame = 1
 			mouse.this_frame = 1
