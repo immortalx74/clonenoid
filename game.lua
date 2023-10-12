@@ -110,8 +110,8 @@ end
 local function DropPowerUp( x, y )
 	-- Drop random powerup
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
-		powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
-		-- powerup.type = e_animation.powerup_l
+		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
+		powerup.type = e_animation.powerup_d
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -303,9 +303,18 @@ local function UpdatePowerUp()
 					obj_gate = GameObject:New( e_object_type.decorative, vec2( metrics.bar_v_r_left, metrics.bar_v_r_top ), e_animation.bar_v_opening )
 				elseif powerup.type == e_animation.powerup_c then
 					for i, v in ipairs( balls ) do
-						v.sticky = true
+						-- v.sticky = true
 					end
 				elseif powerup.type == e_animation.powerup_d then
+					powerup.current = powerup.dropping
+
+					local inv = 1
+					for i = 1, 2 do
+						local b = GameObject:New( e_object_type.ball, vec2( balls[ 1 ].position.x, balls[ 1 ].position.y ), e_animation.ball )
+						b.velocity = lovr.math.newVec2( 150 * inv, -150 * inv )
+						table.insert( balls, b )
+						inv = -1
+					end
 				elseif powerup.type == e_animation.powerup_e then
 					obj_paddle:Destroy()
 					obj_paddle = nil
@@ -395,61 +404,36 @@ local function UpdateBall( dt )
 	local steps = 8
 	for i = 1, #balls do
 		if balls[ i ].sticky then
-			balls[ i ].position.x = obj_paddle.position.x
-			balls[ i ].position.y = obj_paddle.position.y - 8
 			if game_state == e_game_state.play then
 				if IsMouseDown() or timers.balls[ i ]:GetElapsed() > 2 then
 					balls[ i ].sticky = false
-					if IsMouseDown() then
-						sounds.ball_to_paddle:stop()
-						sounds.ball_to_paddle:play()
-					end
+					balls[ i ].velocity.x = 150
+					balls[ i ].velocity.y = -150
+					sounds.ball_to_paddle:stop()
+					sounds.ball_to_paddle:play()
 				end
 			end
-			return
 		end
 
 		local prev_x = balls[ i ].position.x
 		local prev_y = balls[ i ].position.y
 
 		for j = 1, steps do
-			balls[ i ].position.x = balls[ i ].position.x + (balls[ i ].velocity.x / steps) * dt
-			balls[ i ].position.y = balls[ i ].position.y + (balls[ i ].velocity.y / steps) * dt
-
-			-- Keep inside play area
-			if balls[ i ].position.x < metrics.ball_constrain_left then
-				balls[ i ].position.x = metrics.ball_constrain_left
-				balls[ i ].velocity.x = -balls[ i ].velocity.x
-			end
-
-			if balls[ i ].position.x > metrics.ball_constrain_right then
-				balls[ i ].position.x = metrics.ball_constrain_right
-				balls[ i ].velocity.x = -balls[ i ].velocity.x
-			end
-
-			if balls[ i ].position.y < metrics.ball_constrain_top then
-				balls[ i ].position.y = metrics.ball_constrain_top
-				balls[ i ].velocity.y = -balls[ i ].velocity.y
-			end
-
-			if balls[ i ].position.y > game_h then
-				balls[ i ].position.y = game_h
-				balls[ i ].velocity.y = -balls[ i ].velocity.y
-			end
-
-			-- Ball -> paddle collision
-			local half_size = 16
-			if obj_paddle.animation_type == e_animation.paddle_big then
-				half_size = 24
-			end
-
-			if balls[ i ].position.x > obj_paddle.position.x - half_size and balls[ i ].position.x < obj_paddle.position.x + half_size then
-				if balls[ i ].position.y > obj_paddle.position.y - 4 then
-					balls[ i ].velocity.y = -balls[ i ].velocity.y
-					sounds.ball_to_paddle:stop()
-					sounds.ball_to_paddle:play()
+			if balls[ i ].sticky then
+				if not balls[ i ].sticky_offset then
+					balls[ i ].sticky_offset = 0
 				end
+				balls[ i ].position.x = obj_paddle.position.x - balls[ i ].sticky_offset
+				balls[ i ].position.y = obj_paddle.position.y - 8
+				balls[ i ].velocity.x = 0
+				balls[ i ].velocity.y = 0
+			else
+				balls[ i ].position.x = balls[ i ].position.x + (balls[ i ].velocity.x / steps) * dt
+				balls[ i ].position.y = balls[ i ].position.y + (balls[ i ].velocity.y / steps) * dt
 			end
+
+			ConstrainToPlayArea( i )
+			BallToPaddleCollision( i )
 
 			-- Bricks collision
 			local cur_x = balls[ i ].position.x

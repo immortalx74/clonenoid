@@ -123,3 +123,46 @@ function WindowWasResized()
 
 	return false
 end
+
+function ConstrainToPlayArea( ball_idx )
+	if balls[ ball_idx ].position.x < metrics.ball_constrain_left then
+		balls[ ball_idx ].position.x = metrics.ball_constrain_left
+		balls[ ball_idx ].velocity.x = -balls[ ball_idx ].velocity.x
+	end
+
+	if balls[ ball_idx ].position.x > metrics.ball_constrain_right then
+		balls[ ball_idx ].position.x = metrics.ball_constrain_right
+		balls[ ball_idx ].velocity.x = -balls[ ball_idx ].velocity.x
+	end
+
+	if balls[ ball_idx ].position.y < metrics.ball_constrain_top then
+		balls[ ball_idx ].position.y = metrics.ball_constrain_top
+		balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
+	end
+
+	if balls[ ball_idx ].position.y > game_h then
+		balls[ ball_idx ].position.y = game_h
+		balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
+	end
+end
+
+function BallToPaddleCollision( ball_idx )
+	local half_size = 16
+	if obj_paddle.animation_type == e_animation.paddle_big then
+		half_size = 24
+	end
+
+	if balls[ ball_idx ].position.x > obj_paddle.position.x - half_size and balls[ ball_idx ].position.x < obj_paddle.position.x + half_size then
+		if balls[ ball_idx ].position.y > obj_paddle.position.y - 4 then
+			if powerup.current and powerup.current.animation_type == e_animation.powerup_c then
+				balls[ ball_idx ].sticky = true
+				balls[ ball_idx ].sticky_offset = obj_paddle.position.x - balls[ ball_idx ].position.x
+				timers.balls[ ball_idx ]:Reset()
+			else
+				balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
+				sounds.ball_to_paddle:stop()
+				sounds.ball_to_paddle:play()
+			end
+		end
+	end
+end
