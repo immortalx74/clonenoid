@@ -3,7 +3,9 @@ e_game_state  = {
 	generate_level = 2,
 	level_intro = 3,
 	main_screen = 4,
-	story = 5
+	story = 5,
+	lost_life = 6,
+	game_over = 7
 }
 
 e_object_type = {
@@ -135,4 +137,3 @@ bullets       = {}
 timers        = {}
 sounds        = {}
 story_text    = {}
-level_bricks = {}

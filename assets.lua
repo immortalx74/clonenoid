@@ -58,4 +58,5 @@ function LoadSounds()
 	sounds.escape_level = lovr.audio.newSource( "res/sounds/escape_level.wav" )
 	sounds.mothership_intro = lovr.audio.newSource( "res/sounds/mothership_intro.wav" )
 	sounds.paddle_away = lovr.audio.newSource( "res/sounds/paddle_away.wav" )
+	sounds.lost_life = lovr.audio.newSource( "res/sounds/lost_life.wav" )
 end

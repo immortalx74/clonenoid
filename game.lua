@@ -432,7 +432,9 @@ local function UpdateBall( dt )
 				balls[ i ].position.y = balls[ i ].position.y + (balls[ i ].velocity.y / steps) * dt
 			end
 
-			ConstrainToPlayArea( i )
+			if ConstrainToPlayArea( i ) then
+				return
+			end
 			BallToPaddleCollision( i )
 
 			-- Bricks collision
@@ -537,8 +539,40 @@ function Game.Update( dt )
 		GenerateLevel( level_idx )
 		sounds.level_intro:stop()
 		sounds.level_intro:play()
-	elseif game_state == e_game_state.main_screen then
+	elseif game_state == e_game_state.lost_life then
+		if not sounds.lost_life:isPlaying() then
+			life_bar.total = life_bar.total - 1
 
+			local last_life_paddle = life_bar.objects[ #life_bar.objects ]
+			table.remove( life_bar.objects, #life_bar.objects )
+			if last_life_paddle then
+				last_life_paddle:Destroy()
+			end
+
+			if life_bar.total == 0 then
+				-- game_state = e_game_state.game_over
+				game_state = e_game_state.game_over
+				level_idx = 1
+				game_state = e_game_state.main_screen
+				game_objects = nil
+				game_objects = {}
+				-- NOTE need to reset everything
+				return
+			end
+
+			game_state = e_game_state.level_intro
+			balls[ 1 ].position.x = obj_paddle.position.x
+			balls[ 1 ].position.y = obj_paddle.position.y - 8
+			balls[ 1 ].sticky = true
+			timers.balls[ 1 ]:Reset()
+			obj_paddle:Destroy()
+			obj_paddle = nil
+			obj_paddle = GameObject:New( e_object_type.paddle, vec2( game_w / 2, metrics.paddle_y ), e_animation.paddle_appear )
+			obj_paddle.prev_x = 0
+			obj_paddle.can_shoot = false
+			sounds.level_intro:stop()
+			sounds.level_intro:play()
+		end
 	elseif game_state == e_game_state.level_intro then
 		UpdatePaddle()
 		UpdateBall( dt )

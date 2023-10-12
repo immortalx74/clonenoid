@@ -141,9 +141,21 @@ function ConstrainToPlayArea( ball_idx )
 	end
 
 	if balls[ ball_idx ].position.y > game_h then
-		balls[ ball_idx ].position.y = game_h
-		balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
+		-- balls[ ball_idx ].position.y = game_h
+		-- balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
+		-- sounds.lost_life:stop()
+		if #balls > 1 then
+			local b = balls[ ball_idx ]
+			table.remove( balls, ball_idx )
+			b:Destroy()
+			return true
+		else
+			sounds.lost_life:play()
+			game_state = e_game_state.lost_life
+		end
 	end
+
+	return false
 end
 
 function BallToPaddleCollision( ball_idx )
