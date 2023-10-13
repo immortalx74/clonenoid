@@ -1,5 +1,5 @@
 ffi = require "ffi"
-glfw = ffi.load( "glfw3" )
+glfw = ffi.os == 'Windows' and ffi.load('glfw3') or ffi.C
 local GameObject = require "gameobject"
 require "table.clear"
 

@@ -8,7 +8,8 @@ local exclude = {
 	".git",
 	".vscode",
 	"build",
-	"build.lua"
+	"build.lua",
+	"devres"
 }
 
 local function GetFilesAndFolders( directory, excl )
