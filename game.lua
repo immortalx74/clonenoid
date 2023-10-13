@@ -108,10 +108,13 @@ local function DrawScreenText( pass )
 end
 
 local function DropPowerUp( x, y )
+	if #balls > 1 then
+		return
+	end
 	-- Drop random powerup
 	if not powerup.dropping and timers.powerup:GetElapsed() > powerup.interval then
-		-- powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
-		powerup.type = e_animation.powerup_d
+		powerup.type = math.random( e_animation.powerup_b, e_animation.powerup_s )
+		-- powerup.type = e_animation.powerup_d
 		powerup.dropping = GameObject:New( e_object_type.powerup, vec2( x, y ), powerup.type )
 	end
 end
@@ -127,8 +130,7 @@ local function GenerateLevel( idx )
 	obj_paddle   = nil
 	obj_ball     = nil
 	obj_gate     = nil
-	level_bricks = nil
-	level_bricks = {}
+	bullets      = {}
 
 	-- background
 	local bg     = GameObject:New( e_object_type.decorative, vec2( metrics.bg_left, metrics.bg_top ), e_animation.bg )
@@ -172,8 +174,6 @@ local function GenerateLevel( idx )
 				go.strength = 1
 				level.num_destroyable_bricks = level.num_destroyable_bricks + 1
 			end
-
-			table.insert( level_bricks, go )
 		end
 		x = x + metrics.brick_w
 	end
@@ -311,7 +311,7 @@ local function UpdatePowerUp()
 					local inv = 1
 					for i = 1, 2 do
 						local b = GameObject:New( e_object_type.ball, vec2( balls[ 1 ].position.x, balls[ 1 ].position.y ), e_animation.ball )
-						b.velocity = lovr.math.newVec2( 150 * inv, -150 * inv )
+						b.velocity = lovr.math.newVec2( 130 * inv, -130 )
 						table.insert( balls, b )
 						inv = -1
 					end
@@ -540,6 +540,11 @@ function Game.Update( dt )
 		sounds.level_intro:stop()
 		sounds.level_intro:play()
 	elseif game_state == e_game_state.lost_life then
+		-- Destroy falling powerup (if any)
+		if powerup.dropping then
+			powerup.dropping:Destroy()
+			powerup.dropping = nil
+		end
 		if not sounds.lost_life:isPlaying() then
 			life_bar.total = life_bar.total - 1
 
@@ -550,12 +555,10 @@ function Game.Update( dt )
 			end
 
 			if life_bar.total == 0 then
-				-- game_state = e_game_state.game_over
-				game_state = e_game_state.game_over
-				level_idx = 1
-				game_state = e_game_state.main_screen
-				game_objects = nil
-				game_objects = {}
+				level_idx  = 1
+				game_state = e_game_state.generate_level
+				scores     = { high = 50000, player = 0 }
+				life_bar   = { total = 3, objects = {}, max = 6 }
 				-- NOTE need to reset everything
 				return
 			end

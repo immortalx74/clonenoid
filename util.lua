@@ -1,6 +1,7 @@
 ffi = require "ffi"
 glfw = ffi.load( "glfw3" )
 local GameObject = require "gameobject"
+require "table.clear"
 
 ffi.cdef( [[
 	enum {
@@ -148,6 +149,14 @@ function ConstrainToPlayArea( ball_idx )
 			local b = balls[ ball_idx ]
 			table.remove( balls, ball_idx )
 			b:Destroy()
+
+			-- Disable multi-ball powerup if 1 ball left
+			if #balls == 1 then
+				if powerup.current.animation_type == e_animation.powerup_d then
+					powerup.current = nil
+					print( "here" )
+				end
+			end
 			return true
 		else
 			sounds.lost_life:play()
@@ -165,12 +174,33 @@ function BallToPaddleCollision( ball_idx )
 	end
 
 	if balls[ ball_idx ].position.x > obj_paddle.position.x - half_size and balls[ ball_idx ].position.x < obj_paddle.position.x + half_size then
-		if balls[ ball_idx ].position.y > obj_paddle.position.y - 4 then
+		if balls[ ball_idx ].position.y > obj_paddle.position.y - 8 then
 			if powerup.current and powerup.current.animation_type == e_animation.powerup_c then
 				balls[ ball_idx ].sticky = true
 				balls[ ball_idx ].sticky_offset = obj_paddle.position.x - balls[ ball_idx ].position.x
 				timers.balls[ ball_idx ]:Reset()
 			else
+				-- reflect sharply at the edges
+				if balls[ ball_idx ].position.x > obj_paddle.position.x + 8 or balls[ ball_idx ].position.x < obj_paddle.position.x - 8 then
+					if balls[ ball_idx ].velocity.x > 0 then
+						balls[ ball_idx ].velocity.x = balls[ ball_idx ].velocity.x + 50
+						if balls[ ball_idx ].velocity.x > 300 then
+							balls[ ball_idx ].velocity.x = 300
+						end
+					else
+						balls[ ball_idx ].velocity.x = balls[ ball_idx ].velocity.x - 50
+						if balls[ ball_idx ].velocity.x < -300 then
+							balls[ ball_idx ].velocity.x = -300
+						end
+					end
+				else
+					if balls[ ball_idx ].velocity.x > 0 then
+						balls[ ball_idx ].velocity.x = 150
+					else
+						balls[ ball_idx ].velocity.x = -150
+					end
+				end
+
 				balls[ ball_idx ].velocity.y = -balls[ ball_idx ].velocity.y
 				sounds.ball_to_paddle:stop()
 				sounds.ball_to_paddle:play()
