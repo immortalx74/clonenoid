@@ -109,6 +109,7 @@ metrics       = {
 	text_story_top = 26
 }
 
+game_pass = nil
 levels        = {}
 backgrounds   = {}
 textures      = {}

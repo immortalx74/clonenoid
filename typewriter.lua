@@ -27,7 +27,7 @@ function TypeWriter:Draw( pass )
 	if self.started then
 		local char_count = #self.text_writer
 		local half = (char_count * 8) / 2
-		pass:text( self.text_writer, self.position.x + half, self.position.y, 1 )
+		pass:text( self.text_writer, self.position.x + half, self.position.y, 0 )
 
 		if not self.finished and self.timer:GetElapsed() > self.interval then
 			self.text_writer = string.sub( self.text, 1, self.cursor )

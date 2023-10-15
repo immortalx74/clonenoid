@@ -57,7 +57,6 @@ local function DrawScreenText( pass )
 		pass:text( "OF THE ARCADE VERSION", game_w / 2, metrics.text_main_screen_msg + 16, 1 )
 		pass:text( "MADE WITH LÖVR (lovr.org)", game_w / 2, metrics.text_main_screen_msg + 32, 1 )
 
-
 		if timers.press_space:GetElapsed() >= 0.5 then
 			pass:setColor( 1, 0, 0 )
 			pass:text( "[PRESS SPACE TO START]", game_w / 2, metrics.text_main_screen_msg + 48, 1 )
@@ -487,6 +486,7 @@ end
 
 local Game = {}
 function Game.Init()
+	game_pass = lovr.graphics.newPass( game_texture )
 	lovr.graphics.setBackgroundColor( 0, 0, 0 )
 	LoadLevels()
 	LoadTextures()
@@ -638,7 +638,7 @@ function Game.Update( dt )
 end
 
 function Game.Draw( pass )
-	local game_pass = lovr.graphics.getPass( "render", game_texture )
+	game_pass:reset()
 	game_pass:setProjection( 1, mat4():orthographic( game_pass:getDimensions() ) )
 	game_pass:setSampler( sampler )
 
